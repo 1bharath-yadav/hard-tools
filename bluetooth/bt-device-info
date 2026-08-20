@@ -1,0 +1,264 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-device-info
+# Android Bluetooth Detailed Device Reconnaissance & Metadata Inspector
+#
+
+set -e
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_RED="\033[1;31m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_CYAN="\033[1;36m"
+C_MAGENTA="\033[1;35m"
+C_DIM="\033[2m"
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+TARGET="$1"
+
+DUMP=$(run_root "dumpsys bluetooth_manager" 2>/dev/null || true)
+if [[ -z "$DUMP" ]]; then
+    echo -e "${C_RED}[!] Error: Unable to query dumpsys bluetooth_manager. Root required.${C_RESET}" >&2
+    exit 1
+fi
+
+if [[ -z "$TARGET" ]]; then
+    echo -e "${C_CYAN}====================================================${C_RESET}"
+    echo -e "${C_BOLD} Known Bonded Bluetooth Devices${C_RESET}"
+    echo -e "${C_CYAN}====================================================${C_RESET}"
+    echo "$DUMP" | awk '
+    /^  Bonded devices:/ { in_bonded=1; count=0; next }
+    /^[A-Z][a-zA-Z0-9 ]+:/ && !/^  Bonded devices:/ { in_bonded=0 }
+    in_bonded && /^[ ]+([0-9A-Za-z]{2}:){5}[0-9A-Za-z]{2}/ {
+      count++
+      line=$0
+      match(line, /([0-9A-Za-z]{2}:){5}[0-9A-Za-z]{2}/)
+      addr=substr(line, RSTART, RLENGTH)
+      sub(/.*\][ ]*/, "", line)
+      printf "  [%d] \033[1;36m%-19s\033[0m : \033[1m%s\033[0m\n", count, addr, line
+    }
+    '
+    echo
+    echo -e "${C_BOLD}Usage:${C_RESET} bt-device-info <MAC_ADDRESS | NAME_KEYWORD>"
+    exit 0
+fi
+
+# Find device info
+TARGET_LOWER=$(echo "$TARGET" | tr '[:upper:]' '[:lower:]')
+
+# Parse Remote Devices section
+MATCHED_ADDR=$(echo "$DUMP" | awk -v tgt="$TARGET_LOWER" '
+BEGIN { IGNORECASE=1 }
+/^  Bonded devices:/ { in_bonded=1; next }
+/^[A-Z][a-zA-Z0-9 ]+:/ && !/^  Bonded devices:/ { in_bonded=0 }
+in_bonded && /^[ ]+([0-9A-Za-z]{2}:){5}[0-9A-Za-z]{2}/ {
+  line=$0
+  match(line, /([0-9A-Za-z]{2}:){5}[0-9A-Za-z]{2}/)
+  addr=substr(line, RSTART, RLENGTH)
+  if (tolower(addr) ~ tgt || tolower(line) ~ tgt) {
+    print addr
+    exit
+  }
+}
+')
+
+if [[ -z "$MATCHED_ADDR" ]]; then
+    echo -e "${C_RED}[!] Error: No known device found matching '$TARGET'.${C_RESET}"
+    exit 1
+fi
+
+ADDR_LOWER=$(echo "$MATCHED_ADDR" | tr '[:upper:]' '[:lower:]')
+ADDR_UPPER=$(echo "$MATCHED_ADDR" | tr '[:lower:]' '[:upper:]')
+
+echo -e "${C_CYAN}================================================================================${C_RESET}"
+echo -e "${C_BOLD} Bluetooth Device Reconnaissance : ${C_GREEN}${ADDR_UPPER}${C_RESET}"
+echo -e "${C_CYAN}================================================================================${C_RESET}"
+
+# 1. Basic properties from BluetoothRemoteDevices and shim::record
+echo "$DUMP" | awk -v addr_up="$ADDR_UPPER" -v addr_low="$ADDR_LOWER" '
+BEGIN {
+  IGNORECASE=1
+  found=0
+}
+/^BluetoothRemoteDevices/,/^BluetoothActiveDeviceManager/ {
+  if ($0 ~ addr_up || $0 ~ addr_low) {
+    found=1
+    line=$0
+    
+    trans="Unknown"
+    if (match(line, /\[[ ]*(BR\/EDR|LE|DUAL)[ ]*\]/)) {
+      trans=substr(line, RSTART+1, RLENGTH-2)
+      gsub(/ /, "", trans)
+    }
+
+    cod="Unknown"
+    if (match(line, /\[0x[0-9A-Fa-f]+\]/)) {
+      cod=substr(line, RSTART+1, RLENGTH-2)
+    }
+
+    sub(/.*\][ ]*/, "", line)
+    name=line
+
+    print "NAME=\"" name "\""
+    print "TRANSPORT=\"" trans "\""
+    print "COD=\"" cod "\""
+    next
+  }
+  if (found && /\[BR\/EDR UUIDs\]:/) {
+    sub(/.*\[BR\/EDR UUIDs\]:[ ]*/, "")
+    print "BRED_UUIDS=\"" $0 "\""
+  }
+  if (found && /\[LE UUIDs[ ]*\]:/) {
+    sub(/.*\[LE UUIDs[ ]*\]:[ ]*/, "")
+    print "LE_UUIDS=\"" $0 "\""
+  }
+  if (found && /\[Packages[ ]*\]:/) {
+    sub(/.*\[Packages[ ]*\]:[ ]*/, "")
+    print "PACKAGES=\"" $0 "\""
+  }
+  if (found && /^[ ]+([0-9A-Za-z]{2}:){5}[0-9A-Za-z]{2}/ && !($0 ~ addr_up || $0 ~ addr_low)) {
+    found=0
+  }
+}
+
+/^shim::record / && ($0 ~ addr_low || $0 ~ addr_up) {
+  if (match($0, /name:"[^"]+"/)) {
+    rec_name=substr($0, RSTART+6, RLENGTH-7)
+    print "SHIM_NAME=\"" rec_name "\""
+  }
+}
+' > /data/data/com.termux/files/home/hard-tools/.dev_props.tmp 2>/dev/null || true
+
+NAME="Unknown"
+SHIM_NAME=""
+TRANSPORT="Unknown"
+COD="Unknown"
+BRED_UUIDS=""
+LE_UUIDS=""
+PACKAGES=""
+
+if [[ -f "/data/data/com.termux/files/home/hard-tools/.dev_props.tmp" ]]; then
+    source "/data/data/com.termux/files/home/hard-tools/.dev_props.tmp" 2>/dev/null || true
+    rm -f "/data/data/com.termux/files/home/hard-tools/.dev_props.tmp"
+fi
+
+[[ "$NAME" == "Unknown" && -n "$SHIM_NAME" ]] && NAME="$SHIM_NAME"
+
+# CoD description lookup
+COD_DESC="Unspecified Device"
+case "$COD" in
+    0x240404|0x260404) COD_DESC="Audio/Video Headset / Wearable" ;;
+    0x6C010C) COD_DESC="Computer (Laptop/Workstation/Linux)" ;;
+    0x5A020C) COD_DESC="Smartphone / Handheld Device" ;;
+    0x002540) COD_DESC="Peripheral Keyboard / Pointing Device" ;;
+esac
+
+echo -e "${C_MAGENTA}[ Identity & Hardware Details ]${C_RESET}"
+printf "  ${C_BOLD}%-24s${C_RESET} : ${C_GREEN}%s${C_RESET}\n" "Device Name" "$NAME"
+printf "  ${C_BOLD}%-24s${C_RESET} : ${C_CYAN}%s${C_RESET}\n" "MAC Address" "$ADDR_UPPER"
+printf "  ${C_BOLD}%-24s${C_RESET} : %s\n" "Transport Type" "$TRANSPORT"
+printf "  ${C_BOLD}%-24s${C_RESET} : %s (%s)\n" "Class of Device (CoD)" "$COD" "$COD_DESC"
+echo
+
+# 2. Security Record from shim::record
+echo -e "${C_MAGENTA}[ Security & Bond Record (shim::record) ]${C_RESET}"
+echo "$DUMP" | awk -v addr_low="$ADDR_LOWER" -v addr_up="$ADDR_UPPER" '
+BEGIN { IGNORECASE=1 }
+/^shim::record / && ($0 ~ addr_low || $0 ~ addr_up) {
+  line=$0
+  
+  key_type="Unknown"
+  if (match(line, /bredr_linkkey_type:[^,]+/)) {
+    k=substr(line, RSTART, RLENGTH)
+    sub(/^bredr_linkkey_type:/, "", k)
+    key_type=k
+  }
+
+  bond_type="Unknown"
+  if (match(line, /bond_type:[^,]+/)) {
+    b=substr(line, RSTART, RLENGTH)
+    sub(/^bond_type:/, "", b)
+    bond_type=b
+  }
+
+  key_auth="No"
+  if (line ~ /16_digit_key_authenticated:T/) key_auth="Yes (16-Digit MITM Protected)"
+
+  sec_conn="Disabled"
+  if (line ~ /SecureConn:T/) sec_conn="Enabled (Secure Connections P-256)"
+
+  printf "  \033[1m%-24s\033[0m : %s\n", "Bond Type", bond_type
+  printf "  \033[1m%-24s\033[0m : \033[1;33m%s\033[0m\n", "Link Key Type", key_type
+  printf "  \033[1m%-24s\033[0m : %s\n", "16-Digit Authentication", key_auth
+  printf "  \033[1m%-24s\033[0m : %s\n", "Secure Connections", sec_conn
+}
+'
+echo
+
+# 3. Profile UUID Resolution
+translate_uuid() {
+    local u="$1"
+    case "$u" in
+        *1108-*) echo "Headset Profile (HSP - 0x1108)" ;;
+        *110b-*) echo "Audio Sink / A2DP (0x110B)" ;;
+        *110a-*) echo "Audio Source / A2DP (0x110A)" ;;
+        *110e-*) echo "A/V Remote Control Target (AVRCP - 0x110E)" ;;
+        *111e-*) echo "Handsfree Profile (HFP - 0x111E)" ;;
+        *111f-*) echo "Handsfree Audio Gateway (0x111F)" ;;
+        *1124-*) echo "Human Interface Device (HID Host/Device - 0x1124)" ;;
+        *1101-*) echo "Serial Port Profile (SPP - 0x1101)" ;;
+        *fe01-*) echo "FastPair / Companion Extension (0xFE01)" ;;
+        *)       echo "Custom / Vendor Service ($u)" ;;
+    esac
+}
+
+echo -e "${C_MAGENTA}[ Assigned Bluetooth Profiles & UUIDs ]${C_RESET}"
+if [[ -n "$BRED_UUIDS" ]]; then
+    for u in $BRED_UUIDS; do
+        printf "  ${C_GREEN}✓${C_RESET} %s\n" "$(translate_uuid "$u")"
+    done
+fi
+if [[ -n "$LE_UUIDS" ]]; then
+    for u in $LE_UUIDS; do
+        printf "  ${C_CYAN}❖ [LE]${C_RESET} %s\n" "$(translate_uuid "$u")"
+    done
+fi
+if [[ -z "$BRED_UUIDS" && -z "$LE_UUIDS" ]]; then
+    echo -e "  ${C_DIM}No advertised profile UUIDs recorded.${C_RESET}"
+fi
+echo
+
+# 4. Connection Policies and Metadata
+echo -e "${C_MAGENTA}[ Profile Connection Policies & Audio Route ]${C_RESET}"
+echo "$DUMP" | awk -v addr_low="$ADDR_LOWER" -v addr_up="$ADDR_UPPER" '
+BEGIN { IGNORECASE=1 }
+/^Metadata:/ { in_meta=1; next }
+/^[A-Z][a-zA-Z0-9 ]+:/ && !/^Metadata:/ { in_meta=0 }
+in_meta && ($0 ~ addr_low || $0 ~ addr_up) {
+  line=$0
+  if (match(line, /profile connection policy\([^)]+\)/)) {
+    pol=substr(line, RSTART+26, RLENGTH-27)
+    n=split(pol, arr, "|")
+    for (i=1; i<=n; i++) {
+      split(arr[i], kv, "=")
+      if (kv[2] == "100") {
+        printf "  \033[1;32m•\033[0m %-22s : \033[1;32mALLOWED / AUTO-CONNECT (100)\033[0m\n", kv[1]
+      } else if (kv[2] != "-1" && kv[2] != "") {
+        printf "  \033[1;33m•\033[0m %-22s : Configured (%s)\n", kv[1], kv[2]
+      }
+    }
+  }
+}
+'
+echo -e "${C_CYAN}================================================================================${C_RESET}"

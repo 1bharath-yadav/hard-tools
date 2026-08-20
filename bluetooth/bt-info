@@ -1,0 +1,123 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-info
+# Android Bluetooth Controller Hardware & Advertising Capabilities Inspector
+#
+
+set -e
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_CYAN="\033[1;36m"
+C_MAGENTA="\033[1;35m"
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+DUMP=$(run_root "dumpsys bluetooth_manager" 2>/dev/null || true)
+if [[ -z "$DUMP" ]]; then
+    echo -e "\033[1;31m[!] Error: Unable to query dumpsys bluetooth_manager. Root required.\033[0m" >&2
+    exit 1
+fi
+
+PARSED=$(echo "$DUMP" | awk '
+/local_version_information:/ { in_ver=1; next }
+in_ver && /buffer_size:/ { in_ver=0 }
+in_ver && /hci_version:/ { sub(/.*hci_version: */, ""); hci_ver=$0 }
+in_ver && /lmp_version:/ { sub(/.*lmp_version: */, ""); lmp_ver=$0 }
+in_ver && /lmp_subversion:/ { sub(/.*lmp_subversion: */, ""); lmp_subver=$0 }
+in_ver && /manufacturer_name:/ { sub(/.*manufacturer_name: */, ""); mfg=$0 }
+
+/le_number_supported_advertising_sets:/ { sub(/.*le_number_supported_advertising_sets: */, ""); adv_sets=$0 }
+/le_maximum_advertising_data_length:/ { sub(/.*le_maximum_advertising_data_length: */, ""); adv_len=$0 }
+/le_accept_list_size:/ { sub(/.*le_accept_list_size: */, ""); accept_list=$0 }
+/le_resolving_list_size:/ { sub(/.*le_resolving_list_size: */, ""); resolving_list=$0 }
+/le_periodic_advertiser_list_size:/ { sub(/.*le_periodic_advertiser_list_size: */, ""); periodic_list=$0 }
+/MaxConnectedAudioDevices:/ { sub(/.*MaxConnectedAudioDevices: */, ""); max_audio=$0 }
+/A2dpOffloadEnabled:/ { sub(/.*A2dpOffloadEnabled: */, ""); a2dp_offload=$0 }
+
+/vendor_capabilities:/ { in_vc=1; next }
+in_vc && /^[A-Z]/ { in_vc=0 }
+in_vc && /max_adv_instances:/ { sub(/.*max_adv_instances: */, ""); max_adv=$0 }
+in_vc && /offloaded_resolution_of_private_addresses:/ { sub(/.*offloaded_resolution_of_private_addresses: */, ""); offload_priv=$0 }
+in_vc && /total_scan_result_storage:/ { sub(/.*total_scan_result_storage: */, ""); scan_storage=$0 }
+in_vc && /max_filter:/ { sub(/.*max_filter: */, ""); max_filter=$0 }
+in_vc && /activity_energy_info_support:/ { sub(/.*activity_energy_info_support: */, ""); energy_info=$0 }
+in_vc && /a2dp_source_offload_capability_mask:/ { sub(/.*a2dp_source_offload_capability_mask: */, ""); offload_mask=$0 }
+in_vc && /bluetooth_quality_report_support:/ { sub(/.*bluetooth_quality_report_support: */, ""); bqr_support=$0 }
+
+END {
+  if (hci_ver == "") hci_ver = "Unknown"
+  if (lmp_ver == "") lmp_ver = "Unknown"
+  if (lmp_subver == "") lmp_subver = "Unknown"
+  if (mfg == "") mfg = "Unknown"
+  if (adv_sets == "") adv_sets = "Unknown"
+  if (adv_len == "") adv_len = "Unknown"
+  if (accept_list == "") accept_list = "Unknown"
+  if (resolving_list == "") resolving_list = "Unknown"
+  if (periodic_list == "") periodic_list = "Unknown"
+  if (max_audio == "") max_audio = "Unknown"
+  if (a2dp_offload == "") a2dp_offload = "Unknown"
+  if (max_adv == "") max_adv = "Unknown"
+  if (offload_priv == "") offload_priv = "0"
+  if (scan_storage == "") scan_storage = "0"
+  if (max_filter == "") max_filter = "0"
+  if (energy_info == "") energy_info = "0"
+  if (offload_mask == "") offload_mask = "0"
+  if (bqr_support == "") bqr_support = "0"
+
+  print hci_ver "|" lmp_ver "|" lmp_subver "|" mfg "|" adv_sets "|" adv_len "|" accept_list "|" resolving_list "|" periodic_list "|" max_audio "|" a2dp_offload "|" max_adv "|" offload_priv "|" scan_storage "|" max_filter "|" energy_info "|" offload_mask "|" bqr_support
+}
+')
+
+IFS='|' read -r HCI_VER LMP_VER LMP_SUBVER MFG ADV_SETS ADV_LEN ACCEPT_LIST RESOLV_LIST PERIODIC_LIST MAX_AUDIO A2DP_OFFLOAD MAX_ADV OFFLOAD_PRIV SCAN_STORAGE MAX_FILTER ENERGY_INFO OFFLOAD_MASK BQR_SUPPORT <<< "$PARSED"
+
+MFG_NAME="Unknown ($MFG)"
+if [[ "$MFG" == "29" || "$MFG" == "0x001D" ]]; then
+    MFG_NAME="Qualcomm Technologies, Inc. (ID: 29)"
+elif [[ "$MFG" == "15" ]]; then
+    MFG_NAME="Broadcom Corporation (ID: 15)"
+elif [[ "$MFG" == "6" ]]; then
+    MFG_NAME="Microsoft Corporation (ID: 6)"
+elif [[ "$MFG" == "76" ]]; then
+    MFG_NAME="Apple, Inc. (ID: 76)"
+elif [[ "$MFG" == "2" ]]; then
+    MFG_NAME="Intel Corp. (ID: 2)"
+fi
+
+echo -e "${C_CYAN}====================================================${C_RESET}"
+echo -e "${C_BOLD} Android Bluetooth Controller Hardware & Capabilities${C_RESET}"
+echo -e "${C_CYAN}====================================================${C_RESET}"
+
+echo -e "${C_MAGENTA}[ Controller Specification ]${C_RESET}"
+printf "  ${C_BOLD}%-28s${C_RESET} : ${C_GREEN}%s${C_RESET}\n" "HCI Core Version" "$HCI_VER"
+printf "  ${C_BOLD}%-28s${C_RESET} : ${C_GREEN}%s${C_RESET} (Subversion: %s)\n" "LMP Stack Version" "$LMP_VER" "$LMP_SUBVER"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s\n" "Chipset Manufacturer" "$MFG_NAME"
+echo
+
+echo -e "${C_MAGENTA}[ BLE Advertising & Scanning Engine ]${C_RESET}"
+printf "  ${C_BOLD}%-28s${C_RESET} : ${C_GREEN}%s sets${C_RESET} (Concurrent Multi-Adv)\n" "Supported Advertising Sets" "$ADV_SETS"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s bytes\n" "Max Advertising Data Length" "$ADV_LEN"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s entries\n" "LE Accept List Size" "$ACCEPT_LIST"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s entries\n" "LE Resolving List Size" "$RESOLV_LIST"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s\n" "Periodic Advertiser List Size" "$PERIODIC_LIST"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s bytes\n" "Total Scan Result Storage" "$SCAN_STORAGE"
+echo
+
+echo -e "${C_MAGENTA}[ Audio & Hardware Offload Features ]${C_RESET}"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s devices\n" "Max Concurrent Audio Devices" "$MAX_AUDIO"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s (Mask: %s)\n" "A2DP Hardware Offload" "$A2DP_OFFLOAD" "$OFFLOAD_MASK"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s\n" "Offloaded Private Resolution" "$([[ "$OFFLOAD_PRIV" == "1" ]] && echo "Enabled" || echo "Disabled")"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s (Max: %s)\n" "Hardware Filtering Support" "$([[ "$MAX_FILTER" -gt 0 ]] && echo "Enabled" || echo "Disabled")" "$MAX_FILTER"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s\n" "Activity Energy Telemetry" "$([[ "$ENERGY_INFO" == "1" ]] && echo "Supported" || echo "Unsupported")"
+printf "  ${C_BOLD}%-28s${C_RESET} : %s\n" "Bluetooth Quality Report (BQR)" "$([[ "$BQR_SUPPORT" == "1" ]] && echo "Supported" || echo "Unsupported")"
+echo -e "${C_CYAN}====================================================${C_RESET}"

@@ -4,18 +4,33 @@ This file serves as the definitive reference guide and operating manual for AI a
 
 ---
 
-## 1. Project Mission & System Architecture
+## 1. Project Mission & Core Philosophy
 
-`hard-tools` is an advanced USB Gadget Arsenal and offensive/defensive hardware tooling suite running inside an Arch Linux container on Android (via **DroidSpaces**).
+> [!IMPORTANT]
+> **Core Purpose**: `hard-tools` is built for **advanced hardware penetration testing, offensive/defensive hardware research, and USB Gadget weaponization** (BadUSB, Rubber Ducky keystroke injection, rogue network gateways, hardware descriptor spoofing, and low-level hardware reconnaissance). It is **not** a basic utility collection of administrative on/off switches.
 
-It leverages the Linux Kernel **USB Gadget ConfigFS** subsystem (`/config/usb_gadget/g1`), the Android hardware UDC controller, and userspace network/wireless utilities to turn the mobile device into a versatile multi-function hardware tool.
+`hard-tools` operates across a **Dual Execution Architecture**:
 
----
+```
++-------------------------------------------------------------------------+
+|                              HARD-TOOLS                                 |
++------------------------------------+------------------------------------+
+|   1. DROIDSPACES ARCH CONTAINER    |     2. ROOTED TERMUX / ANDROID     |
+|   (USB Gadget ConfigFS Arsenal)    |    (Android Bluetooth Arsenal)     |
++------------------------------------+------------------------------------+
+| • Kernel USB ConfigFS Subsystem    | • Android BluetoothManagerService  |
+| • Hardware UDC (a600000.dwc3)      | • dumpsys bluetooth_manager        |
+| • Mass Storage (CD-ROM/Flash)      | • cmd bluetooth_manager            |
+| • Consolidated USB HID Digitizer   | • service call bluetooth_manager   |
+| • Composite Multi-Gadget Engine    | • BLE Multi-Advertising (16 sets)  |
+| • RNDIS + Captive Portal (BadUSB)  | • Hardware Audio Codec Offload     |
+| • UVC USB Webcam & MTP/PTP         | • PAN Tethering & Device Inspection|
++------------------------------------+------------------------------------+
+```
 
-## 2. Environment & Permissions
-
-- **User**: `archer` (UID 1000)
-- **Privileges**: Passwordless `sudo` configured in `/etc/sudoers.d/archer`.
+### Environment 1: DroidSpaces Arch Linux Container
+- **Target Role**: USB Gadget Subsystem, ConfigFS management, kernel UDC routing, mass storage disk mounting, virtual keyboard/touchpad HID injections, captive network routing.
+- **User**: `archer` (UID 1000) with passwordless `sudo` in `/etc/sudoers.d/archer`.
 - **Gadget Root**: `/config/usb_gadget/g1/`
 - **Active Config**: `/config/usb_gadget/g1/configs/b.1/`
 - **Functions Dir**: `/config/usb_gadget/g1/functions/`
@@ -23,6 +38,35 @@ It leverages the Linux Kernel **USB Gadget ConfigFS** subsystem (`/config/usb_ga
 - **Shared Storage**: `/storage/emulated/0/hard-tools/`
   - Disk Images: `/storage/emulated/0/hard-tools/drive/` (fallback: `./images/`)
   - Payloads: `/storage/emulated/0/hard-tools/payloads/` (fallback: `./payloads/`)
+
+### Environment 2: Rooted Termux (Native Android Framework)
+- **Target Role**: Android Bluetooth Arsenal and native framework inspection.
+- **Access**: Elevated Android root shell (`su -c`).
+- **Mechanism**: Communicates directly with Android's `bluetooth_manager` system service (`android.bluetooth.IBluetoothManager`) via `cmd bluetooth_manager`, `dumpsys bluetooth_manager`, and `service call bluetooth_manager`.
+
+---
+
+## 2. Bluetooth Platform Classification & Capability Matrix
+
+Android does **not** expose a standard Linux BlueZ socket stack (`/dev/hci0`, `hciconfig`, `l2ping`) to userspace by default. Instead, Bluetooth is managed at the kernel/HAL level by Qualcomm/Android Bluetooth stack. Therefore, the Bluetooth tooling is implemented as an **Android Bluetooth Arsenal**.
+
+### Capability Matrix
+
+| Capability | Status | Implementation Mechanism |
+| :--- | :---: | :--- |
+| **Bluetooth Framework** | ✅ | `android.bluetooth.IBluetoothManager` |
+| **Bluetooth Manager Service** | ✅ | `dumpsys bluetooth_manager` / `cmd bluetooth_manager` |
+| **Enable/Disable Adapter** | ✅ | `cmd bluetooth_manager enable` / `disable` / `enableBle` |
+| **Read Controller Info** | ✅ | `dumpsys bluetooth_manager` (`HCI ControllerImpl`) |
+| **Read Advertising Capabilities** | ✅ | Extracted from controller dumpsys (`le_number_supported_advertising_sets`) |
+| **Read PAN State** | ✅ | `shim::legacy::pan` & `bt-pan` interface |
+| **Read HID State** | ✅ | `shim::legacy::hid` & `HID_HOST` profile inspection |
+| **Read A2DP / Codecs** | ✅ | `A2dpOffloadEnabled` & `a2dp_source_offload_capability_mask` |
+| **Read Known & Bonded Devices** | ✅ | `BluetoothRemoteDevices` & `shim::record` parser |
+| **Bluetooth Service Discovery** | ✅ | `Enabled Profile Services` & SDP dumpsys |
+| **BLE Multi-Advertising** | ✅ (16 sets) | Up to 16 concurrent advertising sets supported |
+| **Linux BlueZ / hciconfig** | ❌ | Not exposed natively on standard Android kernels |
+| **Raw L2CAP Ping / Packet Capture** | ❌ | Requires custom external HCI adapter or BlueZ kernel patch |
 
 ---
 
@@ -32,7 +76,8 @@ It leverages the Linux Kernel **USB Gadget ConfigFS** subsystem (`/config/usb_ga
 > 1. **DO NOT MODIFY `scripts/mass_storage_manager.sh`**: The existing `scripts/mass_storage_manager.sh` script is fully working and verified. Keep it untouched. `launcher.sh` calls `scripts/mass_storage_manager.sh` directly for Mass Storage management.
 > 2. **ConfigFS UDC Handling**: You **MUST unbind UDC** with `echo none > /config/usb_gadget/g1/UDC` before adding or removing symlinks in `configs/b.1/`. After changing links, rebind to `a600000.dwc3`.
 > 3. **Consolidated HID Controller (`scripts/usb-gadget.sh`)**: Keyboard and Pointer (touchpad/mouse) are consolidated into `scripts/usb-gadget.sh` using dynamic device discovery (`cat $G/functions/hid.*/dev` -> `/dev/hidg*`).
-> 4. **Self-Contained & Clean Exit**: Every script must support both non-interactive execution (`start`, `stop`, `status`) and interactive UI. No background processes or dangling symlinks should remain after stopping a module.
+> 4. **Shebang Preservation**: Do NOT modify shebangs in `launcher.sh` or core gadget scripts in a way that breaks DroidSpaces Arch Linux execution.
+> 5. **Self-Contained & Clean Exit**: Every script must support both non-interactive execution (`start`, `stop`, `status`) and interactive UI. No background processes or dangling symlinks should remain after stopping a module.
 
 ---
 
@@ -44,6 +89,29 @@ hard-tools/
 ├── aim.md                     # Initial roadmap and feature specification
 ├── kernel.config              # Active kernel build configuration
 ├── launcher.sh                # Interactive master TUI menu (only script in root)
+├── bluetooth/                 # Android Bluetooth Arsenal (Rooted Termux / Native)
+│   ├── bt-status              # Live status, power, MAC, uptime & connected device
+│   ├── bt-status-fast         # Sub-millisecond state via Binder Fast Path (TXN 3/6/7)
+│   ├── bt-toggle              # Power & mode switch (on, off, ble-on, reset, wait)
+│   ├── bt-discovery           # Discovery and inquiry lifecycle status & controller
+│   ├── bt-paired              # Fast paired & bonded device inventory table
+│   ├── bt-events              # Real-time stack event stream (SCAN, ACL, SDP, RFCOMM)
+│   ├── bt-reset               # Soft recovery & verified adapter power cycle
+│   ├── bt-scan                # Live scanner telemetry, active clients & start/stop stream
+│   ├── bt-info                # HCI/LMP versions, manufacturer & 16-set BLE specs
+│   ├── bt-services            # Advertised services and UUID discovery per device
+│   ├── bt-security            # Security auditor (Link key types, MITM, P-256 SC)
+│   ├── bt-audio               # Audio stack, active sink routing & DSP offload mask
+│   ├── bt-profiles            # Registered services (GATT, A2DP, HID, PAN, etc.)
+│   ├── bt-devices             # Known & bonded devices, CoD, and link key types
+│   ├── bt-device-info         # Deep per-device reconnaissance, UUIDs & policies
+│   ├── bt-pan                 # Personal Area Network (NAP/PANU) & bt-pan state
+│   ├── bt-pan-status          # Dedicated PAN interface and gateway status
+│   ├── bt-codecs              # Hi-Res audio codecs (LDAC, aptX HD, AAC, SBC, LC3)
+│   ├── bt-ble-info            # BLE 5.0+ multi-advertising specs and buffer limits
+│   ├── bt-ble-clients         # Active BLE scanner client applications and filters
+│   ├── bt-binder-map          # Automated Binder transaction enumerator & mapper
+│   └── bt-watch               # Real-time 2s refresh activity monitor
 ├── lib/
 │   ├── utils.sh               # Central helper library (UDC, ConfigFS, colors, logging)
 │   ├── hid_keymap.sh          # 104-key USB keycode & modifier mapping
@@ -59,7 +127,7 @@ hard-tools/
 │   ├── ducky.sh               # Hak5 DuckyScript runner
 │   ├── badusb.sh              # Rogue gateway, captive portal & DNS spoofer
 │   ├── uvc_webcam.sh          # UVC USB Webcam gadget
-│   ├── bt_arsenal.sh          # BlueZ Bluetooth recon & L2ping tools
+│   ├── bt_arsenal.sh          # Unified Bluetooth Arsenal & BlueZ fallback
 │   ├── netfilter.sh           # Iptables NAT/redirection & packet capture
 │   └── mtp_ptp.sh             # MTP/PTP media transfer gadget
 ├── payloads/                  # DuckyScript payloads (.duck / .txt)
@@ -71,15 +139,48 @@ hard-tools/
 
 ## 5. Status of Features
 
-| Feature | Script | Status | Notes |
-| :--- | :--- | :--- | :--- |
-| **Mass Storage** | `mass_storage_manager.sh` | ✅ Done | Working great. DO NOT MODIFY. |
-| **USB HID Controller** | `scripts/usb-gadget.sh` | ✅ Done | Dynamic mapping, 8-byte KB, 12-byte pointer, Jiggler, Ducky. |
-| **ADB Gadget** | `scripts/adb_gadget.sh` | ✅ Done | Controls `ffs.adb`. |
-| **RNDIS Ethernet** | `scripts/rndis.sh` | ✅ Done | Uses `rndis.rndis` + `dnsmasq`. |
-| **BadUSB (MITM)** | `scripts/badusb.sh` | ✅ Done | RNDIS + DNS spoofing / captive portal. |
-| **UVC Webcam** | `scripts/uvc_webcam.sh` | ✅ Done | `uvc.0` descriptor & test feed. |
-| **Bluetooth Suite** | `scripts/bt_arsenal.sh` | ✅ Done | BlueZ `l2ping`, `bluetoothctl`, recon. |
-| **Netfilter / Sniff** | `scripts/netfilter.sh` | ✅ Done | `iptables` port redirect + `tcpdump`. |
-| **MTP / PTP** | `scripts/mtp_ptp.sh` | ✅ Done | `ffs.mtp` & `ffs.ptp` mode. |
-| **Master Launcher** | `launcher.sh` | ✅ Done | Unified menu dashboard. |
+| Feature | Script / Subsystem | Environment | Status | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Mass Storage** | `scripts/mass_storage_manager.sh` | DroidSpaces | ✅ Done | Working great. DO NOT MODIFY. |
+| **USB HID Controller** | `scripts/usb-gadget.sh` | DroidSpaces | ✅ Done | Dynamic mapping, 8-byte KB, 12-byte pointer, Jiggler, Ducky. |
+| **ADB Gadget** | `scripts/adb_gadget.sh` | DroidSpaces | ✅ Done | Controls `ffs.adb`. |
+| **RNDIS Ethernet** | `scripts/rndis.sh` | DroidSpaces | ✅ Done | Uses `rndis.rndis` + `dnsmasq`. |
+| **BadUSB (MITM)** | `scripts/badusb.sh` | DroidSpaces | ✅ Done | RNDIS + DNS spoofing / captive portal. |
+| **UVC Webcam** | `scripts/uvc_webcam.sh` | DroidSpaces | ✅ Done | `uvc.0` descriptor & test feed. |
+| **Android BT Arsenal** | `bluetooth/bt-*` | Rooted Termux | ✅ Done | Full status, toggle, codecs, profiles, devices, PAN, watch. |
+| **Bluetooth Suite** | `scripts/bt_arsenal.sh` | Dual Runtime | ✅ Done | Bridges Android Bluetooth Arsenal & BlueZ stack. |
+| **Netfilter / Sniff** | `scripts/netfilter.sh` | DroidSpaces | ✅ Done | `iptables` port redirect + `tcpdump`. |
+| **MTP / PTP** | `scripts/mtp_ptp.sh` | DroidSpaces | ✅ Done | `ffs.mtp` & `ffs.ptp` mode. |
+| **Master Launcher** | `launcher.sh` | Dual Runtime | ✅ Done | Unified menu dashboard. |
+
+---
+
+## 6. Android Bluetooth Arsenal Usage & Observability Engine
+
+### Core Utilities Overview
+- `bluetooth/bt-status` : Real-time power state, adapter MAC address, uptime, paired device count, and active A2DP/HFP sinks. Supports `--json`, `--raw`, and `--quiet`.
+- `bluetooth/bt-status-fast` : Sub-millisecond state querying via direct Binder fast path (`service call bluetooth_manager 3/6/7`).
+- `bluetooth/bt-toggle [on|off|toggle|ble-on|ble-off|reset|wait-on|wait-off]` : High-speed adapter power manipulation via `cmd bluetooth_manager`.
+- `bluetooth/bt-reset` : Soft recovery & verified power cycle with Binder-level state convergence.
+- `bluetooth/bt-discovery [status|start|stop]` : Discovery and inquiry lifecycle status & controller.
+- `bluetooth/bt-paired` : Clean, fast tabular bonded device inventory (`Name | MAC | Transport | CoD`).
+- `bluetooth/bt-devices [-v|--verbose] [-j|--json]` : Parsed inventory of bonded devices with MAC, class of device (CoD), transport types, and link keys.
+- `bluetooth/bt-device-info <MAC|KEYWORD>` : Deep reconnaissance on a specific target device: Class of Device (CoD), security/link key types, 16-digit MITM auth, advertised profile UUIDs, and connection policies.
+- `bluetooth/bt-services [MAC|KEYWORD]` : Advertised services and standard UUID translator (A2DP, AVRCP, HFP, HID, SPP, PAN, FastPair).
+- `bluetooth/bt-security [MAC|KEYWORD]` : Link-layer security auditor classifying MITM protection, P-256 Secure Connections, and link keys.
+- `bluetooth/bt-scan [-w|--watch] [interval]` : Flagship scanner telemetry tracking registered client packages (e.g. GMS Nearby Fast Pair), scan filters, and live start/stop event streams from `shim::btm`.
+- `bluetooth/bt-events [-f|--follow] [count]` : Real-time Bluetooth stack event stream (SCAN, ACL connections, SDP discoveries, RFCOMM channels).
+- `bluetooth/bt-info` : Complete HCI/LMP hardware inspection, Qualcomm chipset verification, and 16-set BLE advertising parameters.
+- `bluetooth/bt-ble-info` : BLE 5.0+ multi-advertising specs, extended payloads (1650B), and privacy list limits.
+- `bluetooth/bt-ble-clients` : Registered BLE scanner client applications, mode distribution, and scan filters.
+- `bluetooth/bt-profiles` : Active subsystem inspection (GATT, A2DP, AVRCP, HID Host, PAN, MAP, PBAP, SAP).
+- `bluetooth/bt-pan` / `bt-pan-status` : Personal Area Network (NAP/PANU) state and Linux kernel `bt-pan` interface monitor.
+- `bluetooth/bt-codecs` / `bt-audio` : High-resolution audio codec matrix (LDAC, aptX HD, aptX, AAC, SBC, LC3, LHDC), active audio sink routing, and DSP hardware offload mask.
+- `bluetooth/bt-binder-map [service] [max_txn]` : Automated Binder transaction code enumerator and parcel response classifier.
+- `bluetooth/bt-watch [interval]` : Continuous ANSI live dashboard monitoring Bluetooth transactions.
+
+### Binder Fast Path Mapping (`android.bluetooth.IBluetoothManager`)
+- `TXN 03`: `getState()` -> `0x0c` (12 = `STATE_ON`)
+- `TXN 06`: `isEnabled()` -> `0x01` (true)
+- `TXN 07`: `isBleScanAlwaysAvailable()` -> `0x01` (true)
+- `TXN 19`: `getAdapter()` -> returns active `IBluetooth` Binder token reference.

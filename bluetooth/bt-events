@@ -1,0 +1,97 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-events
+# Real-Time Android Bluetooth Stack Event Stream & Activity Logger
+#
+
+set -e
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_RED="\033[1;31m"
+C_CYAN="\033[1;36m"
+C_MAGENTA="\033[1;35m"
+C_BLUE="\033[1;34m"
+C_DIM="\033[2m"
+
+FOLLOW=0
+COUNT=25
+INTERVAL=2
+
+for arg in "$@"; do
+    case "$arg" in
+        -f|--follow|-w|--watch) FOLLOW=1 ;;
+        [0-9]*) COUNT="$arg" ;;
+    esac
+done
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+render_events() {
+    local dump
+    dump=$(run_root "dumpsys bluetooth_manager" 2>/dev/null || true)
+    if [[ -z "$dump" ]]; then
+        echo -e "${C_RED}[!] Error: Unable to query dumpsys bluetooth_manager.${C_RESET}" >&2
+        return 1
+    fi
+
+    echo -e "${C_CYAN}================================================================================${C_RESET}"
+    echo -e "${C_BOLD} Bluetooth Stack Event Stream (shim::btm / ACL / SDP / Scan Logs)${C_RESET}"
+    echo -e "${C_CYAN}================================================================================${C_RESET}"
+    printf "  ${C_BOLD}%-12s %-10s %-26s %s${C_RESET}\n" "TIME" "TAG" "EVENT TYPE" "DETAILS / TARGET"
+    echo -e "  ------------------------------------------------------------------------------"
+
+    echo "$dump" | awk -v max_count="$COUNT" '
+    /^shim::btm/ {
+      date=$2
+      time=$3
+      tag=$4
+      
+      line=$0
+      sub(/^.*shim::btm[ ]+[0-9-]+ [0-9:.]+[ ]+[A-Z]+[ ]+/, "", line)
+
+      tag_color="\033[1;34m"
+      if (tag == "SCAN") tag_color="\033[1;32m"
+      else if (tag == "ACL") tag_color="\033[1;36m"
+      else if (tag == "SDP") tag_color="\033[1;35m"
+      else if (tag == "API") tag_color="\033[1;33m"
+      else if (tag == "RFCOMM") tag_color="\033[1;31m"
+
+      # Split event type and details
+      event_type=line
+      details=""
+      if (match(line, /:[ ]*/)) {
+        event_type=substr(line, 1, RSTART-1)
+        details=substr(line, RSTART+RLENGTH)
+      }
+
+      gsub(/^[ ]+|[ ]+$/, "", event_type)
+      gsub(/^[ ]+|[ ]+$/, "", details)
+
+      printf "  %-12s " tag_color "[%-6s]\033[0m %-26s \033[2m%s\033[0m\n", time, tag, event_type, details
+    }
+    ' | tail -n "$COUNT"
+    echo -e "${C_CYAN}================================================================================${C_RESET}"
+}
+
+if [[ $FOLLOW -eq 1 ]]; then
+    trap 'echo -e "\n\033[1;36m[*] Exiting Event Stream. Goodbye!\033[0m"; exit 0' INT TERM
+    while true; do
+        clear 2>/dev/null || true
+        render_events
+        echo -e "\033[2mStreaming live events every ${INTERVAL}s. Press Ctrl+C to stop.\033[0m"
+        sleep "$INTERVAL"
+    done
+else
+    render_events
+fi

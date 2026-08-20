@@ -1,0 +1,49 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-ble-info
+# Android BLE Multi-Advertising & Controller Specification Report
+#
+
+set -e
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_CYAN="\033[1;36m"
+C_MAGENTA="\033[1;35m"
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+DUMP=$(run_root "dumpsys bluetooth_manager" 2>/dev/null || true)
+if [[ -z "$DUMP" ]]; then
+    echo -e "\033[1;31m[!] Error: Unable to query dumpsys bluetooth_manager.${C_RESET}" >&2
+    exit 1
+fi
+
+ADV_SETS=$(echo "$DUMP" | awk '/le_number_supported_advertising_sets:/ { sub(/.*le_number_supported_advertising_sets: */, ""); print; exit }')
+ADV_MAX_LEN=$(echo "$DUMP" | awk '/le_maximum_advertising_data_length:/ { sub(/.*le_maximum_advertising_data_length: */, ""); print; exit }')
+PERIODIC_LIST=$(echo "$DUMP" | awk '/le_periodic_advertiser_list_size:/ { sub(/.*le_periodic_advertiser_list_size: */, ""); print; exit }')
+ACCEPT_LIST=$(echo "$DUMP" | awk '/le_accept_list_size:/ { sub(/.*le_accept_list_size: */, ""); print; exit }')
+RESOLV_LIST=$(echo "$DUMP" | awk '/le_resolving_list_size:/ { sub(/.*le_resolving_list_size: */, ""); print; exit }')
+MAX_ADV_INST=$(echo "$DUMP" | awk '/max_adv_instances:/ { sub(/.*max_adv_instances: */, ""); print; exit }')
+
+echo -e "${C_CYAN}====================================================${C_RESET}"
+echo -e "${C_BOLD} Bluetooth Low Energy (BLE) Hardware Capabilities${C_RESET}"
+echo -e "${C_CYAN}====================================================${C_RESET}"
+printf "  ${C_BOLD}%-32s${C_RESET} : ${C_GREEN}%s concurrent sets${C_RESET}\n" "Supported Advertising Sets" "${ADV_SETS:-16}"
+printf "  ${C_BOLD}%-32s${C_RESET} : ${C_GREEN}%s instances${C_RESET}\n" "Max Advertising Instances" "${MAX_ADV_INST:-16}"
+printf "  ${C_BOLD}%-32s${C_RESET} : %s bytes\n" "Max Advertising Data Payload" "${ADV_MAX_LEN:-1650}"
+printf "  ${C_BOLD}%-32s${C_RESET} : %s\n" "Periodic Advertiser List Size" "${PERIODIC_LIST:-3}"
+printf "  ${C_BOLD}%-32s${C_RESET} : %s entries\n" "Filter Accept List Size" "${ACCEPT_LIST:-128}"
+printf "  ${C_BOLD}%-32s${C_RESET} : %s entries\n" "Privacy Resolving List Size" "${RESOLV_LIST:-32}"
+printf "  ${C_BOLD}%-32s${C_RESET} : %s\n" "Extended Advertising (BLE 5.0+)" "$([[ "${ADV_MAX_LEN:-0}" -gt 31 ]] && echo -e "${C_GREEN}Supported${C_RESET}" || echo "Unsupported")"
+echo -e "${C_CYAN}====================================================${C_RESET}"

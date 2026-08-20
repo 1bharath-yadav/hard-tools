@@ -1,0 +1,47 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-watch
+# Android Bluetooth Real-Time Activity & State Monitor
+#
+
+set -e
+
+INTERVAL="${1:-2}"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+trap 'echo -e "\n\033[1;36m[*] Exiting Bluetooth Monitor. Goodbye!\033[0m"; exit 0' INT TERM
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+while true; do
+    clear 2>/dev/null || true
+    echo -e "\033[1;36m====================================================\033[0m"
+    echo -e "\033[1m Android Bluetooth Live Watcher [$(date '+%Y-%m-%d %H:%M:%S')]\033[0m"
+    echo -e "\033[1;36m====================================================\033[0m"
+
+    if [[ -x "${DIR}/bt-status" ]]; then
+        "${DIR}/bt-status"
+    fi
+
+    echo
+    echo -e "\033[1;35m[ Recent BLE / Adapter Scan Activity ]\033[0m"
+    run_root "dumpsys bluetooth_manager" 2>/dev/null | awk '
+    /^shim::btm/ && /SCAN/ {
+      line=$0
+      sub(/^shim::btm[ ]+/, "", line)
+      print "  " line
+    }
+    ' | tail -n 6
+
+    echo
+    echo -e "\033[2mRefreshing every ${INTERVAL}s. Press Ctrl+C to stop.\033[0m"
+    sleep "$INTERVAL"
+done

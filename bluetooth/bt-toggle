@@ -1,0 +1,135 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-toggle
+# Android Bluetooth Power & Mode Controller
+#
+
+set -e
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_RED="\033[1;31m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_CYAN="\033[1;36m"
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+cmd_bt() {
+    run_root "cmd bluetooth_manager $*"
+}
+
+is_enabled() {
+    local st
+    st=$(run_root "dumpsys bluetooth_manager" 2>/dev/null | awk '/^Bluetooth Status/,/^[A-Z]/ { if (/enabled:/) { print $2; exit } }')
+    [[ "$st" == "true" ]]
+}
+
+ACTION="${1:-toggle}"
+
+case "$ACTION" in
+    on|enable)
+        echo -e "${C_CYAN}[*] Enabling Android Bluetooth Adapter...${C_RESET}"
+        cmd_bt enable
+        sleep 1
+        if is_enabled; then
+            echo -e "${C_GREEN}[+] Bluetooth is now ON.${C_RESET}"
+        else
+            echo -e "${C_YELLOW}[*] Command sent. Adapter transitioning to ON...${C_RESET}"
+        fi
+        ;;
+
+    off|disable)
+        echo -e "${C_CYAN}[*] Disabling Android Bluetooth Adapter...${C_RESET}"
+        cmd_bt disable
+        sleep 1
+        if ! is_enabled; then
+            echo -e "${C_GREEN}[+] Bluetooth is now OFF.${C_RESET}"
+        else
+            echo -e "${C_YELLOW}[*] Command sent. Adapter transitioning to OFF...${C_RESET}"
+        fi
+        ;;
+
+    ble-on|enableBle)
+        echo -e "${C_CYAN}[*] Activating BLE-only mode...${C_RESET}"
+        cmd_bt enableBle
+        echo -e "${C_GREEN}[+] BLE mode requested.${C_RESET}"
+        ;;
+
+    ble-off|disableBle)
+        echo -e "${C_CYAN}[*] Deactivating BLE-only mode...${C_RESET}"
+        cmd_bt disableBle
+        echo -e "${C_GREEN}[+] BLE-only mode disabled.${C_RESET}"
+        ;;
+
+    reset|factory-reset)
+        echo -e "${C_YELLOW}[!] Performing Factory Reset of Bluetooth Settings...${C_RESET}"
+        cmd_bt factoryReset
+        echo -e "${C_GREEN}[+] Bluetooth factory reset complete.${C_RESET}"
+        ;;
+
+    wait-on)
+        echo -e "${C_CYAN}[*] Waiting for adapter state: STATE_ON...${C_RESET}"
+        cmd_bt wait-for-state:STATE_ON || true
+        echo -e "${C_GREEN}[+] State reached: STATE_ON${C_RESET}"
+        ;;
+
+    wait-off)
+        echo -e "${C_CYAN}[*] Waiting for adapter state: STATE_OFF...${C_RESET}"
+        cmd_bt wait-for-state:STATE_OFF || true
+        echo -e "${C_GREEN}[+] State reached: STATE_OFF${C_RESET}"
+        ;;
+
+    status)
+        DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        if [[ -x "${DIR}/bt-status" ]]; then
+            "${DIR}/bt-status"
+        else
+            if is_enabled; then
+                echo -e "${C_GREEN}[+] Bluetooth: ON${C_RESET}"
+            else
+                echo -e "${C_RED}[-] Bluetooth: OFF${C_RESET}"
+            fi
+        fi
+        ;;
+
+    toggle)
+        if is_enabled; then
+            echo -e "${C_YELLOW}[*] Bluetooth is currently ON -> Switching OFF...${C_RESET}"
+            cmd_bt disable
+            echo -e "${C_GREEN}[+] Bluetooth turned OFF.${C_RESET}"
+        else
+            echo -e "${C_CYAN}[*] Bluetooth is currently OFF -> Switching ON...${C_RESET}"
+            cmd_bt enable
+            echo -e "${C_GREEN}[+] Bluetooth turned ON.${C_RESET}"
+        fi
+        ;;
+
+    -h|--help|help)
+        echo -e "${C_BOLD}Usage:${C_RESET} bt-toggle [on|off|toggle|ble-on|ble-off|reset|wait-on|wait-off|status]"
+        echo
+        echo "Commands:"
+        echo "  on, enable          Turn Bluetooth ON"
+        echo "  off, disable        Turn Bluetooth OFF"
+        echo "  toggle              Toggle between ON and OFF (default if no argument)"
+        echo "  ble-on, enableBle   Activate BLE-only mode"
+        echo "  ble-off, disableBle Undo BLE-only mode"
+        echo "  reset               Perform factory reset of Bluetooth stack"
+        echo "  wait-on / wait-off  Block until adapter reaches desired state"
+        echo "  status              Display current Bluetooth status"
+        ;;
+
+    *)
+        echo -e "${C_RED}[!] Unknown argument: $ACTION${C_RESET}"
+        echo "Usage: bt-toggle [on|off|toggle|ble-on|ble-off|reset|status]"
+        exit 1
+        ;;
+esac

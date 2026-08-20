@@ -1,0 +1,71 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-pan
+# Android Bluetooth PAN (Personal Area Network) & Tethering Inspector
+#
+
+set -e
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_CYAN="\033[1;36m"
+C_MAGENTA="\033[1;35m"
+C_DIM="\033[2m"
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+DUMP=$(run_root "dumpsys bluetooth_manager" 2>/dev/null || true)
+if [[ -z "$DUMP" ]]; then
+    echo -e "\033[1;31m[!] Error: Unable to query dumpsys bluetooth_manager. Root required.\033[0m" >&2
+    exit 1
+fi
+
+PAN_SHIM=$(echo "$DUMP" | awk '/shim::legacy::pan Connections:/ { print; exit }')
+PAN_CONN="0"
+if [[ "$PAN_SHIM" =~ Connections:([0-9]+) ]]; then
+    PAN_CONN="${BASH_REMATCH[1]}"
+fi
+
+NAP_PROP=$(run_root "getprop bluetooth.profile.pan.nap.enabled" 2>/dev/null || echo "unknown")
+PANU_PROP=$(run_root "getprop bluetooth.profile.pan.panu.enabled" 2>/dev/null || echo "unknown")
+
+IFACE_INFO=$(run_root "ip addr show bt-pan 2>/dev/null" || true)
+
+echo -e "${C_CYAN}====================================================${C_RESET}"
+echo -e "${C_BOLD} Android Bluetooth PAN (Personal Area Network)${C_RESET}"
+echo -e "${C_CYAN}====================================================${C_RESET}"
+
+echo -e "${C_MAGENTA}[ PAN Subsystem & Roles ]${C_RESET}"
+printf "  ${C_BOLD}%-26s${C_RESET} : %s\n" "NAP Role (Access Point)" "$([[ "$NAP_PROP" == "true" ]] && echo -e "${C_GREEN}Enabled${C_RESET}" || echo "$NAP_PROP")"
+printf "  ${C_BOLD}%-26s${C_RESET} : %s\n" "PANU Role (User Client)" "$([[ "$PANU_PROP" == "true" ]] && echo -e "${C_GREEN}Enabled${C_RESET}" || echo "$PANU_PROP")"
+printf "  ${C_BOLD}%-26s${C_RESET} : %s\n" "Active PAN Connections" "$PAN_CONN"
+printf "  ${C_BOLD}%-26s${C_RESET} : %s\n" "PAN Shim State" "${PAN_SHIM:-Active in PanService}"
+echo
+
+echo -e "${C_MAGENTA}[ Network Interface State (bt-pan) ]${C_RESET}"
+if [[ -n "$IFACE_INFO" ]]; then
+    echo -e "${C_GREEN}[+] Interface 'bt-pan' is UP/PRESENT in Linux kernel:${C_RESET}"
+    echo "$IFACE_INFO" | sed 's/^/  /'
+else
+    echo -e "${C_YELLOW}[*] Interface 'bt-pan' is currently DOWN/UNALLOCATED.${C_RESET}"
+    echo -e "${C_DIM}    (The bt-pan interface is created dynamically by Android RNDIS/PAN daemon${C_RESET}"
+    echo -e "${C_DIM}     when Bluetooth Tethering or a PAN client connects).${C_RESET}"
+fi
+echo
+
+echo -e "${C_MAGENTA}[ Tethering / Gateway Operational Info ]${C_RESET}"
+echo "  • To share Internet via Bluetooth PAN (NAP Mode):"
+echo "    Enable 'Bluetooth Tethering' in Android Settings -> Portable Hotspot / Tethering."
+echo "  • To join a remote PAN network as client (PANU Mode):"
+echo "    Pair with the host and select 'Internet access' in paired device settings."
+echo -e "${C_CYAN}====================================================${C_RESET}"

@@ -1,0 +1,85 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-status-fast
+# Sub-Millisecond Android Bluetooth Status via Binder Fast Path (TXN 3/6/7)
+#
+
+set -e
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_RED="\033[1;31m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_CYAN="\033[1;36m"
+C_DIM="\033[2m"
+
+run_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -c "$*"
+    else
+        "$@"
+    fi
+}
+
+call_txn() {
+    local txn="$1"
+    run_root "service call bluetooth_manager $txn" 2>/dev/null || true
+}
+
+# Transaction 3: getState()
+RAW_ST=$(call_txn 3)
+STATE_CODE=$(echo "$RAW_ST" | awk '/Result: Parcel/ { print $4 }' || true)
+
+# Transaction 6: isEnabled()
+RAW_EN=$(call_txn 6)
+ENABLED_CODE=$(echo "$RAW_EN" | awk '/Result: Parcel/ { print $4 }' || true)
+
+# Transaction 7: isBleScanAlwaysAvailable()
+RAW_BLE=$(call_txn 7)
+BLE_CODE=$(echo "$RAW_BLE" | awk '/Result: Parcel/ { print $4 }' || true)
+
+STATE_NAME="UNKNOWN"
+STATE_COLOR="$C_RED"
+
+case "$STATE_CODE" in
+    *000a|*10) STATE_NAME="STATE_OFF"; STATE_COLOR="$C_RED" ;;
+    *000b|*11) STATE_NAME="STATE_TURNING_ON"; STATE_COLOR="$C_YELLOW" ;;
+    *000c|*12) STATE_NAME="STATE_ON"; STATE_COLOR="$C_GREEN" ;;
+    *000d|*13) STATE_NAME="STATE_TURNING_OFF"; STATE_COLOR="$C_YELLOW" ;;
+    *000e|*14) STATE_NAME="STATE_BLE_TURNING_ON"; STATE_COLOR="$C_YELLOW" ;;
+    *000f|*15) STATE_NAME="STATE_BLE_ON"; STATE_COLOR="$C_YELLOW" ;;
+    *0010|*16) STATE_NAME="STATE_BLE_TURNING_OFF"; STATE_COLOR="$C_YELLOW" ;;
+esac
+
+IS_ENABLED="false"
+[[ "$ENABLED_CODE" =~ 1$ ]] && IS_ENABLED="true"
+
+BLE_AVAIL="false"
+[[ "$BLE_CODE" =~ 1$ ]] && BLE_AVAIL="true"
+
+if [[ "${1:-}" == "--raw" || "${1:-}" == "-r" ]]; then
+    echo "STATE=$STATE_NAME"
+    echo "ENABLED=$IS_ENABLED"
+    echo "BLE_SCAN_ALWAYS_AVAILABLE=$BLE_AVAIL"
+    exit 0
+fi
+
+if [[ "${1:-}" == "--json" || "${1:-}" == "-j" ]]; then
+    cat << JSON_EOF
+{
+  "state": "${STATE_NAME}",
+  "enabled": ${IS_ENABLED},
+  "ble_scan_always_available": ${BLE_AVAIL}
+}
+JSON_EOF
+    exit 0
+fi
+
+if [[ "${1:-}" == "--quiet" || "${1:-}" == "-q" ]]; then
+    [[ "$IS_ENABLED" == "true" || "$STATE_NAME" == "STATE_ON" || "$STATE_NAME" == "STATE_BLE_ON" ]] && exit 0 || exit 1
+fi
+
+echo -e "${C_CYAN}⚡ [Binder Fast Path]${C_RESET} ${C_BOLD}Bluetooth State:${C_RESET} ${STATE_COLOR}${STATE_NAME}${C_RESET} | ${C_BOLD}Enabled:${C_RESET} ${IS_ENABLED} | ${C_BOLD}BLE Scan Always:${C_RESET} ${BLE_AVAIL}"
