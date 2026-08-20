@@ -34,15 +34,14 @@ This document serves as the master feature catalog, capability matrix, and techn
 
 | Subsystem / Feature | Runtime Environment | Underlying Technology | Current Status | Description & Pentest Capability |
 | :--- | :--- | :--- | :---: | :--- |
-| **USB Mass Storage** | DroidSpaces Arch | Kernel ConfigFS `mass_storage.0` | ✅ **Implemented** | Working USB Mass Storage manager supporting CD-ROM ISO & Flash images (`scripts/mass_storage_manager.sh`). |
-| **Consolidated USB HID** | DroidSpaces Arch | Kernel ConfigFS `hid.keyboard` / `hid.touchpad` | ✅ **Implemented** | Consolidated 8-byte Keyboard, 12-byte Precision Touchpad, Mouse Jiggler, and Ducky parser (`scripts/usb-gadget.sh`). |
-| **Composite Multi-Gadget** | DroidSpaces Arch | Multi-Function ConfigFS Symlinks | ✅ **Implemented** | Simultaneous multi-function combinations (e.g. HID + Mass Storage + RNDIS + UVC) (`scripts/composite_gadget.sh`). |
-| **BadUSB Rogue Gateway** | DroidSpaces Arch | `rndis.rndis` + `dnsmasq` + `iptables` | ✅ **Implemented** | RNDIS USB network adapter with DNS spoofing and HTTP credential harvest portal (`scripts/badusb.sh`). |
-| **RNDIS USB Ethernet** | DroidSpaces Arch | Kernel ConfigFS `rndis.rndis` | ✅ **Implemented** | Provides USB Ethernet tethering and local DHCP router gateway to host (`scripts/rndis.sh`). |
-| **UVC USB Webcam** | DroidSpaces Arch | Kernel ConfigFS `uvc.0` | ✅ **Implemented** | Emulates USB Video Class (UVC) webcam device and streaming feed (`scripts/uvc_webcam.sh`). |
-| **ADB Gadget Switch** | DroidSpaces Arch | Kernel ConfigFS `ffs.adb` | ✅ **Implemented** | Seamless switching between USB Gadget modes and Android Debug Bridge (`scripts/adb_gadget.sh`). |
-| **MTP / PTP Media Mode** | DroidSpaces Arch | Kernel ConfigFS `ffs.mtp` / `ffs.ptp` | ✅ **Implemented** | Emulates Media Transfer Protocol and Picture Transfer Protocol (`scripts/mtp_ptp.sh`). |
-| **Netfilter & Sniffer** | DroidSpaces Arch | Linux `iptables` + `tcpdump` | ✅ **Implemented** | Port redirection, NAT forwarding, and packet capture on USB network interfaces (`scripts/netfilter.sh`). |
+| **USB Mass Storage** | DroidSpaces Arch | Kernel ConfigFS `mass_storage.0` | ✅ **Implemented** | Working USB Mass Storage manager supporting CD-ROM ISO & Flash images (`usb_gadget/mass_storage_manager.sh`). |
+| **Consolidated USB HID** | DroidSpaces Arch | Kernel ConfigFS `hid.keyboard` / `hid.touchpad` | ✅ **Implemented** | Consolidated 8-byte Keyboard, 12-byte Precision Touchpad, Mouse Jiggler, and Ducky parser (`usb_gadget/hid.sh`). |
+| **BadUSB Rogue Gateway** | DroidSpaces Arch | `rndis.rndis` + `dnsmasq` + `iptables` | ✅ **Implemented** | RNDIS USB network adapter with DNS spoofing and HTTP credential harvest portal (`usb_gadget/badusb.sh`). |
+| **RNDIS USB Ethernet** | DroidSpaces Arch | Kernel ConfigFS `rndis.rndis` | ✅ **Implemented** | Provides USB Ethernet tethering and local DHCP router gateway to host (`usb_gadget/rndis.sh`). |
+| **UVC USB Webcam** | DroidSpaces Arch | Kernel ConfigFS `uvc.0` | ✅ **Implemented** | Emulates USB Video Class (UVC) webcam device and streaming feed (`usb_gadget/uvc.sh`). |
+| **ADB Gadget Switch** | DroidSpaces Arch | Kernel ConfigFS `ffs.adb` | ✅ **Implemented** | Seamless switching between USB Gadget modes and Android Debug Bridge (`usb_gadget/adb.sh`). |
+| **MTP / PTP Media Mode** | DroidSpaces Arch | Kernel ConfigFS `ffs.mtp` / `ffs.ptp` | ✅ **Implemented** | Emulates Media Transfer Protocol and Picture Transfer Protocol (`usb_gadget/mtp_ptp.sh`). |
+| **Netfilter & Sniffer** | DroidSpaces Arch | Linux `iptables` + `tcpdump` | ✅ **Implemented** | Port redirection, NAT forwarding, and packet capture on USB network interfaces (`network/netfilter.sh`). |
 | **Master TUI Launcher** | Dual Runtime | Interactive ANSI Bash Dashboard | ✅ **Implemented** | Central unified terminal UI with real-time gadget and Bluetooth status indicators (`launcher.sh`). |
 | **Android Bluetooth Arsenal** | Rooted Termux | `android.bluetooth.IBluetoothManager` | ✅ **Implemented** | 22 dedicated tools for fast Binder querying, real-time scan telemetry, security auditing, codecs, and PAN. |
 | **USB Chameleon (VID/PID Spoof)** | DroidSpaces Arch | Dynamic ConfigFS Descriptor Rewriter | 🛠️ **Planned** | Spoofs vendor/product IDs (Apple, Logitech, Dell, SanDisk) to bypass USB endpoint whitelisting / EDR. |
@@ -58,13 +57,13 @@ This document serves as the master feature catalog, capability matrix, and techn
 
 ### 3.1 USB Gadget Arsenal (DroidSpaces Arch Linux)
 
-* **USB Mass Storage Manager (`scripts/mass_storage_manager.sh`)**:
+* **USB Mass Storage Manager (`usb_gadget/mass_storage_manager.sh`)**:
   * Emulates USB Flash drives and CD-ROM optical drives using kernel ConfigFS (`mass_storage.0`).
   * Supports creating, formatting, and mounting raw disk images (.img / .iso).
   * Direct LUN configuration: Read-Only flag, Removable media flag, CD-ROM mode toggle.
   * *Rule*: Keep untouched as verified working.
 
-* **Consolidated USB HID Controller (`scripts/usb-gadget.sh`)**:
+* **Consolidated USB HID Controller (`usb_gadget/hid.sh`)**:
   * Consolidates virtual keyboard (`hid.keyboard`) and pointer (`hid.touchpad` / `hid.mouse`) into a single engine.
   * Dynamic device detection (`/dev/hidg*` mapping via `/config/usb_gadget/g1/functions/hid.*/dev`).
   * 8-byte standard keyboard descriptor with full 104-key US layout translation.
@@ -72,11 +71,7 @@ This document serves as the master feature catalog, capability matrix, and techn
   * Built-in Anti-Sleep Hardware Mouse Jiggler with randomized intervals.
   * Hak5 DuckyScript runner for automated keystroke injection.
 
-* **Composite Multi-Gadget Engine (`scripts/composite_gadget.sh`)**:
-  * Binds multiple USB functions simultaneously to a single ConfigFS configuration (`configs/b.1`).
-  * Enables simultaneous execution of Mass Storage + Virtual Keyboard + RNDIS Ethernet + UVC Webcam.
-
-* **BadUSB Rogue Gateway & Captive Portal (`scripts/badusb.sh`)**:
+* **BadUSB Rogue Gateway & Captive Portal (`usb_gadget/badusb.sh`)**:
   * Activates RNDIS Ethernet gadget (`rndis.rndis`) and assigns IP subnet `192.168.42.0/24`.
   * Runs lightweight `dnsmasq` to assign host IP and hijack DNS queries.
   * Spins up a rogue HTTP captive portal (`lib/rogue_portal.py`) capturing submitted credentials.

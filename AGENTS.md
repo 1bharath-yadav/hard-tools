@@ -117,7 +117,6 @@ hard-tools/
 ├── usb_gadget/                # Core USB Gadget Engines & Controllers
 │   ├── mass_storage_manager.sh# [DO NOT MODIFY] Working USB Mass Storage manager
 │   ├── hid.sh                 # Consolidated USB HID Controller (Keyboard, Touchpad, Jiggler)
-│   ├── composite.sh           # Multi-function Composite Controller
 │   ├── rndis.sh               # RNDIS Ethernet + DHCP/DNS router
 │   ├── badusb.sh              # Rogue gateway, captive portal & DNS spoofer
 │   ├── uvc.sh                 # UVC USB Webcam gadget
@@ -156,7 +155,6 @@ hard-tools/
 | **RNDIS Ethernet** | `usb_gadget/rndis.sh` | DroidSpaces | ✅ Done | Uses `rndis.rndis` + `dnsmasq`. |
 | **BadUSB (MITM)** | `usb_gadget/badusb.sh` | DroidSpaces | ✅ Done | RNDIS + DNS spoofing / captive portal. |
 | **UVC Webcam** | `usb_gadget/uvc.sh` | DroidSpaces | ✅ Done | `uvc.0` descriptor & test feed. |
-| **Composite Gadget** | `usb_gadget/composite.sh` | DroidSpaces | ✅ Done | Simultaneous multi-function combinations. |
 | **Android BT Arsenal** | `bluetooth/bt-*` | Rooted Termux | ✅ Done | Full status, toggle, codecs, profiles, devices, PAN, watch. |
 | **Bluetooth Suite** | `bluetooth/bt_arsenal.sh` | Dual Runtime | ✅ Done | Bridges Android Bluetooth Arsenal & BlueZ stack. |
 | **Netfilter / Sniff** | `network/netfilter.sh` | DroidSpaces | ✅ Done | `iptables` port redirect + `tcpdump`. |

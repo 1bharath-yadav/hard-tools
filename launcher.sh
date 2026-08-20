@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # hard-tools: launcher.sh
-# Master Dashboard & TUI Launcher for USB Arsenal & Multi-Gadget Tooling
+# Master Dashboard & TUI Launcher for USB Arsenal & Hardware Tooling
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,7 +15,6 @@ BT_DIR="${SCRIPT_DIR}/bluetooth"
 
 MASS_STORAGE_BIN="${USB_DIR}/mass_storage_manager.sh"
 USB_GADGET_BIN="${USB_DIR}/hid.sh"
-COMPOSITE_BIN="${USB_DIR}/composite.sh"
 RNDIS_BIN="${USB_DIR}/rndis.sh"
 BADUSB_BIN="${USB_DIR}/badusb.sh"
 UVC_BIN="${USB_DIR}/uvc.sh"
@@ -50,17 +49,6 @@ get_module_status() {
         rndis)
             if is_function_linked "rndis.rndis"; then
                 printf "${COLOR_GREEN}[ACTIVE]${COLOR_RESET}"
-            else
-                printf "${COLOR_DIM}[OFF]${COLOR_RESET}"
-            fi ;;
-        composite)
-            local count=0
-            is_function_linked "hid.keyboard" && ((count++)) || true
-            is_function_linked "mass_storage.0" && ((count++)) || true
-            is_function_linked "rndis.rndis" && ((count++)) || true
-            is_function_linked "uvc.0" && ((count++)) || true
-            if [[ $count -ge 2 ]]; then
-                printf "${COLOR_GREEN}[COMPOSITE %d]${COLOR_RESET}" "$count"
             else
                 printf "${COLOR_DIM}[OFF]${COLOR_RESET}"
             fi ;;
@@ -112,20 +100,19 @@ show_main_menu() {
     echo -e "   2) ADB Gadget Switch       $(get_module_status adb)"
     echo -e "   3) USB HID Controller      $(get_module_status hid)  [KB/MOUSE/DUCKY]"
     echo -e "   4) RNDIS USB Ethernet      $(get_module_status rndis)"
-    echo -e "   5) USB Composite Arsenal   $(get_module_status composite)  [MULTI-FUNCTION]"
-    echo -e "   6) BadUSB (Rogue Gateway)  $(get_module_status badusb)"
-    echo -e "   7) UVC USB Webcam          $(get_module_status uvc)"
-    echo -e "   8) MTP / PTP Media Mode    $(get_module_status mtp)"
+    echo -e "   5) BadUSB (Rogue Gateway)  $(get_module_status badusb)"
+    echo -e "   6) UVC USB Webcam          $(get_module_status uvc)"
+    echo -e "   7) MTP / PTP Media Mode    $(get_module_status mtp)"
     echo
     echo -e "  ${COLOR_BOLD}Network & Operator Tools:${COLOR_RESET}"
-    echo -e "   9) Bluetooth Attack Suite  ${COLOR_DIM}[ANDROID BT / BLUEZ]${COLOR_RESET}"
-    echo -e "  10) Netfilter & Sniffer     ${COLOR_DIM}[IPTABLES/PCAP]${COLOR_RESET}"
-    echo -e "  11) System & Bus Recon      ${COLOR_DIM}[operator/recon.sh]${COLOR_RESET}"
-    echo -e "  12) Session Logger          ${COLOR_DIM}[operator/session.sh]${COLOR_RESET}"
+    echo -e "   8) Bluetooth Attack Suite  ${COLOR_DIM}[ANDROID BT / BLUEZ]${COLOR_RESET}"
+    echo -e "   9) Netfilter & Sniffer     ${COLOR_DIM}[IPTABLES/PCAP]${COLOR_RESET}"
+    echo -e "  10) System & Bus Recon      ${COLOR_DIM}[operator/recon.sh]${COLOR_RESET}"
+    echo -e "  11) Session Logger          ${COLOR_DIM}[operator/session.sh]${COLOR_RESET}"
     echo
     echo -e "  ${COLOR_BOLD}Quick Utilities:${COLOR_RESET}"
-    echo -e "  13) Emergency Unbind All USB Gadgets"
-    echo -e "  14) View ConfigFS Active Links"
+    echo -e "  12) Emergency Unbind All USB Gadgets"
+    echo -e "  13) View ConfigFS Active Links"
     echo -e "   0) Exit"
     echo
 }
@@ -147,7 +134,7 @@ show_active_configfs() {
 main() {
     while true; do
         show_main_menu
-        read -rp "Select option [0-14]: " opt
+        read -rp "Select option [0-13]: " opt
         case "$opt" in
             1)
                 if [[ -x "${MASS_STORAGE_BIN}" ]]; then
@@ -158,16 +145,15 @@ main() {
             2)  bash "${ADB_BIN}" ;;
             3)  sudo "${USB_GADGET_BIN}" tui ;;
             4)  bash "${RNDIS_BIN}" ;;
-            5)  bash "${COMPOSITE_BIN}" ;;
-            6)  bash "${BADUSB_BIN}" ;;
-            7)  bash "${UVC_BIN}" ;;
-            8)  bash "${MTP_BIN}" ;;
-            9)  bash "${BT_BIN}" ;;
-            10) bash "${NETFILTER_BIN}" ;;
-            11) bash "${RECON_BIN}" ;;
-            12) bash "${SESSION_BIN}" ;;
-            13) emergency_unbind ;;
-            14) show_active_configfs ;;
+            5)  bash "${BADUSB_BIN}" ;;
+            6)  bash "${UVC_BIN}" ;;
+            7)  bash "${MTP_BIN}" ;;
+            8)  bash "${BT_BIN}" ;;
+            9)  bash "${NETFILTER_BIN}" ;;
+            10) bash "${RECON_BIN}" ;;
+            11) bash "${SESSION_BIN}" ;;
+            12) emergency_unbind ;;
+            13) show_active_configfs ;;
             0|q|Q|exit)
                 c_cyan "Exiting hard-tools USB Arsenal. Happy Hacking!"
                 exit 0 ;;
