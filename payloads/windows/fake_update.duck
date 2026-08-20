@@ -1,0 +1,8 @@
+REM Fullscreen Fake Update Prank
+DELAY 1000
+GUI r
+DELAY 500
+STRING https://fakeupdate.net/win10ue/
+ENTER
+DELAY 1500
+F11

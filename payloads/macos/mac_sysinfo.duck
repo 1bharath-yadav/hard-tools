@@ -1,0 +1,9 @@
+REM macOS System Info Collector
+DELAY 1000
+GUI SPACE
+DELAY 500
+STRING Terminal
+ENTER
+DELAY 1000
+STRING uname -a; whoami; system_profiler SPHardwareDataType
+ENTER

@@ -1,0 +1,6 @@
+REM Cross-Platform RickRoll Payload
+DELAY 1000
+GUI r
+DELAY 500
+STRING https://www.youtube.com/watch?v=dQw4w9WgXcQ
+ENTER

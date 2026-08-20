@@ -1,0 +1,6 @@
+REM Linux Terminal Reconnaissance
+DELAY 1000
+CTRL ALT t
+DELAY 800
+STRING uname -a; whoami; ip addr show; df -h
+ENTER

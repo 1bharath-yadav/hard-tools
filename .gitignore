@@ -1,0 +1,13 @@
+# Local state and logs
+*.log
+*.pcap
+*.pid
+*.state
+/sessions/
+__pycache__/
+*.pyc
+
+# Local binary disk images
+images/*.img
+/images/*.img
+/drive/
