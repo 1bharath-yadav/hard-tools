@@ -8,10 +8,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/lib"
 source "${LIB_DIR}/utils.sh"
 
-SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
-MASS_STORAGE_BIN="${SCRIPTS_DIR}/mass_storage_manager.sh"
-USB_GADGET_BIN="${SCRIPTS_DIR}/usb-gadget.sh"
-COMPOSITE_BIN="${SCRIPTS_DIR}/composite_gadget.sh"
+USB_DIR="${SCRIPT_DIR}/usb_gadget"
+NET_DIR="${SCRIPT_DIR}/network"
+OP_DIR="${SCRIPT_DIR}/operator"
+BT_DIR="${SCRIPT_DIR}/bluetooth"
+
+MASS_STORAGE_BIN="${USB_DIR}/mass_storage_manager.sh"
+USB_GADGET_BIN="${USB_DIR}/hid.sh"
+COMPOSITE_BIN="${USB_DIR}/composite.sh"
+RNDIS_BIN="${USB_DIR}/rndis.sh"
+BADUSB_BIN="${USB_DIR}/badusb.sh"
+UVC_BIN="${USB_DIR}/uvc.sh"
+ADB_BIN="${USB_DIR}/adb.sh"
+MTP_BIN="${USB_DIR}/mtp_ptp.sh"
+NETFILTER_BIN="${NET_DIR}/netfilter.sh"
+BT_BIN="${BT_DIR}/bt_arsenal.sh"
+RECON_BIN="${OP_DIR}/recon.sh"
+SESSION_BIN="${OP_DIR}/session.sh"
 
 get_module_status() {
     local mod="$1"
@@ -94,7 +107,7 @@ BANNER_EOF
 
 show_main_menu() {
     show_banner
-    echo -e "  ${COLOR_BOLD}USB Gadget Modules:${COLOR_RESET}"
+    echo -e "  ${COLOR_BOLD}USB Gadget Modules (usb_gadget/):${COLOR_RESET}"
     echo -e "   1) Mass Storage Manager    $(get_module_status mass_storage)"
     echo -e "   2) ADB Gadget Switch       $(get_module_status adb)"
     echo -e "   3) USB HID Controller      $(get_module_status hid)  [KB/MOUSE/DUCKY]"
@@ -104,13 +117,15 @@ show_main_menu() {
     echo -e "   7) UVC USB Webcam          $(get_module_status uvc)"
     echo -e "   8) MTP / PTP Media Mode    $(get_module_status mtp)"
     echo
-    echo -e "  ${COLOR_BOLD}Wireless & Network Arsenal:${COLOR_RESET}"
-    echo -e "   9) Bluetooth Attack Suite  ${COLOR_DIM}[BLUEZ]${COLOR_RESET}"
+    echo -e "  ${COLOR_BOLD}Network & Operator Tools:${COLOR_RESET}"
+    echo -e "   9) Bluetooth Attack Suite  ${COLOR_DIM}[ANDROID BT / BLUEZ]${COLOR_RESET}"
     echo -e "  10) Netfilter & Sniffer     ${COLOR_DIM}[IPTABLES/PCAP]${COLOR_RESET}"
+    echo -e "  11) System & Bus Recon      ${COLOR_DIM}[operator/recon.sh]${COLOR_RESET}"
+    echo -e "  12) Session Logger          ${COLOR_DIM}[operator/session.sh]${COLOR_RESET}"
     echo
     echo -e "  ${COLOR_BOLD}Quick Utilities:${COLOR_RESET}"
-    echo -e "  11) Emergency Unbind All USB Gadgets"
-    echo -e "  12) View ConfigFS Active Links"
+    echo -e "  13) Emergency Unbind All USB Gadgets"
+    echo -e "  14) View ConfigFS Active Links"
     echo -e "   0) Exit"
     echo
 }
@@ -132,7 +147,7 @@ show_active_configfs() {
 main() {
     while true; do
         show_main_menu
-        read -rp "Select option [0-12]: " opt
+        read -rp "Select option [0-14]: " opt
         case "$opt" in
             1)
                 if [[ -x "${MASS_STORAGE_BIN}" ]]; then
@@ -140,17 +155,19 @@ main() {
                 else
                     bash "${MASS_STORAGE_BIN}"
                 fi ;;
-            2)  bash "${SCRIPTS_DIR}/adb_gadget.sh" ;;
+            2)  bash "${ADB_BIN}" ;;
             3)  sudo "${USB_GADGET_BIN}" tui ;;
-            4)  bash "${SCRIPTS_DIR}/rndis.sh" ;;
+            4)  bash "${RNDIS_BIN}" ;;
             5)  bash "${COMPOSITE_BIN}" ;;
-            6)  bash "${SCRIPTS_DIR}/badusb.sh" ;;
-            7)  bash "${SCRIPTS_DIR}/uvc_webcam.sh" ;;
-            8)  bash "${SCRIPTS_DIR}/mtp_ptp.sh" ;;
-            9)  bash "${SCRIPTS_DIR}/bt_arsenal.sh" ;;
-            10) bash "${SCRIPTS_DIR}/netfilter.sh" ;;
-            11) emergency_unbind ;;
-            12) show_active_configfs ;;
+            6)  bash "${BADUSB_BIN}" ;;
+            7)  bash "${UVC_BIN}" ;;
+            8)  bash "${MTP_BIN}" ;;
+            9)  bash "${BT_BIN}" ;;
+            10) bash "${NETFILTER_BIN}" ;;
+            11) bash "${RECON_BIN}" ;;
+            12) bash "${SESSION_BIN}" ;;
+            13) emergency_unbind ;;
+            14) show_active_configfs ;;
             0|q|Q|exit)
                 c_cyan "Exiting hard-tools USB Arsenal. Happy Hacking!"
                 exit 0 ;;

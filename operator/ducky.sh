@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(cd "${SCRIPT_DIR}/../lib" && pwd)"
 source "${LIB_DIR}/utils.sh"
 
-USB_GADGET_SCRIPT="${SCRIPT_DIR}/usb-gadget.sh"
+USB_GADGET_SCRIPT="${SCRIPT_DIR}/../usb_gadget/hid.sh"
 HID_ENGINE="${LIB_DIR}/hid_engine.py"
 
 ensure_hid_ready() {
