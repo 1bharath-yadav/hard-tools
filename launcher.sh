@@ -94,6 +94,12 @@ get_module_status() {
             else
                 printf "${COLOR_DIM}[OFF]${COLOR_RESET}"
             fi ;;
+        bt_hid)
+            if su -c "dumpsys activity services com.example.hidtest 2>/dev/null | grep -q 'HidService'" 2>/dev/null; then
+                printf "${COLOR_GREEN}[ACTIVE]${COLOR_RESET}"
+            else
+                printf "${COLOR_DIM}[OFF]${COLOR_RESET}"
+            fi ;;
     esac
 }
 
@@ -133,16 +139,17 @@ show_main_menu() {
     echo -e "   8) UVC USB Webcam          $(get_module_status uvc)"
     echo -e "   9) MTP / PTP Media Mode    $(get_module_status mtp)"
     echo
-    echo -e "  ${COLOR_BOLD}Offensive Payloads & Traffic Interception:${COLOR_RESET}"
+    echo -e "  ${COLOR_BOLD}Offensive Payloads & Wireless Bluetooth:${COLOR_RESET}"
     echo -e "  10) Weaponized Ducky 3.0    ${COLOR_DIM}[MULTI-OS STAGED ARSENAL]${COLOR_RESET}"
     echo -e "  11) Netfilter & Sniffer     $(get_module_status pcap_streamer)  [IPTABLES / WIRESHARK BRIDGE]"
-    echo -e "  12) Bluetooth Attack Suite  ${COLOR_DIM}[ANDROID BT / BINDER ARSENAL]${COLOR_RESET}"
-    echo -e "  13) System & Bus Recon      ${COLOR_DIM}[operator/recon.sh]${COLOR_RESET}"
-    echo -e "  14) Terminal Session Logger ${COLOR_DIM}[operator/session.sh]${COLOR_RESET}"
+    echo -e "  12) Bluetooth HID Device    $(get_module_status bt_hid)  [WIRELESS KEYBOARD / DUCKY INJECTION]"
+    echo -e "  13) Bluetooth Arsenal Suite ${COLOR_DIM}[ANDROID BT / BINDER ARSENAL]${COLOR_RESET}"
+    echo -e "  14) System & Bus Recon      ${COLOR_DIM}[operator/recon.sh]${COLOR_RESET}"
+    echo -e "  15) Terminal Session Logger ${COLOR_DIM}[operator/session.sh]${COLOR_RESET}"
     echo
     echo -e "  ${COLOR_BOLD}System Operations:${COLOR_RESET}"
-    echo -e "  15) Emergency Unbind All USB Gadgets"
-    echo -e "  16) View ConfigFS Active Links"
+    echo -e "  16) Emergency Unbind All USB Gadgets"
+    echo -e "  17) View ConfigFS Active Links"
     echo -e "   0) Exit"
     echo
 }
@@ -164,7 +171,7 @@ show_active_configfs() {
 main() {
     while true; do
         show_main_menu
-        read -rp "Select option [0-16]: " opt
+        read -rp "Select option [0-17]: " opt
         case "$opt" in
             1)
                 if [[ -x "${MASS_STORAGE_BIN}" ]]; then
@@ -182,11 +189,12 @@ main() {
             9)  bash "${MTP_BIN}" ;;
             10) bash "${DUCKY_BIN}" ;;
             11) bash "${NETFILTER_BIN}" ;;
-            12) bash "${BT_BIN}" ;;
-            13) bash "${RECON_BIN}" ;;
-            14) bash "${SESSION_BIN}" ;;
-            15) emergency_unbind ;;
-            16) show_active_configfs ;;
+            12) bash "${BT_DIR}/bt-hid" ;;
+            13) bash "${BT_BIN}" ;;
+            14) bash "${RECON_BIN}" ;;
+            15) bash "${SESSION_BIN}" ;;
+            16) emergency_unbind ;;
+            17) show_active_configfs ;;
             0|q|Q|exit)
                 c_cyan "Exiting hard-tools USB Arsenal. Happy Hacking!"
                 exit 0 ;;

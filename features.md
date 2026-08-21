@@ -48,6 +48,7 @@ This document serves as the master feature catalog, capability matrix, and techn
 | **MTP / PTP Media Mode** | DroidSpaces Arch | Kernel ConfigFS `ffs.mtp` / `ffs.ptp` | ✅ **Implemented** | Emulates Media Transfer Protocol and Picture Transfer Protocol (`usb_gadget/mtp_ptp.sh`). |
 | **Master TUI Launcher** | Dual Runtime | Interactive ANSI Bash Dashboard | ✅ **Implemented** | Central unified terminal UI with real-time gadget and Bluetooth status indicators (`launcher.sh`). |
 | **Android Bluetooth Arsenal** | Rooted Termux | `android.bluetooth.IBluetoothManager` | ✅ **Implemented** | 22 dedicated tools for fast Binder querying, real-time scan telemetry, security auditing, codecs, and PAN. |
+| **Bluetooth HID Device (Wireless Ducky)** | Rooted Termux | `BluetoothHidDevice` + `btif_hd.cc` + `/dev/uhid` | ✅ **Implemented** | Turns phone into persistent Bluetooth HID Keyboard. Injects strings, keystrokes, and executes Hak5 DuckyScript wirelessly (`bluetooth/bt-hid`). |
 | **External OTG Wi-Fi / Dongles** | DroidSpaces Arch | USB OTG Host Kernel Modules | ❌ **Excluded** | Wi-Fi packet injection / external dongles explicitly out of scope (no external hardware reliance). |
 
 ---
@@ -102,18 +103,27 @@ bluetooth/
 │   ├── bt-services            # Advertised services and standard UUID translator
 │   ├── bt-security            # Security auditor (Link key types, MITM, P-256 SC)
 │   └── bt-audio               # Audio stack, active sink routing & DSP offload mask
-├── Tier 3: PAN Gateway
+├── Tier 3: Wireless HID Device & Keystroke Injection
+│   └── bt-hid                 # Bluetooth HID Device Keyboard, Text Typer & Wireless DuckyScript
+├── Tier 4: PAN Gateway
 │   ├── bt-pan                 # Personal Area Network (NAP/PANU) state & configuration
 │   └── bt-pan-status          # Dedicated PAN interface and gateway status
-├── Tier 4: BLE Engine
+├── Tier 5: BLE Engine
 │   ├── bt-ble-info            # BLE 5.0+ multi-advertising specs (16 sets, 1650B)
 │   ├── bt-ble-clients         # Active BLE scanner client applications and filters
 │   └── bt-scan                # Flagship scanner telemetry & start/stop event stream
-└── Tier 5: Binder Fast Path
+└── Tier 6: Binder Fast Path
     ├── bt-status-fast         # Sub-millisecond state querying (TXN 3/6/7)
     ├── bt-binder-map          # Automated Binder transaction code enumerator
     └── bt-watch               # Continuous ANSI live dashboard monitor
 ```
+
+* **Bluetooth HID Device & Keystroke Injection (`bluetooth/bt-hid`)**:
+  * Emulates a standalone Bluetooth HID Hardware Keyboard via Android's `BluetoothHidDevice` API, `btif_hd.cc` JNI layer, and kernel `/dev/uhid`.
+  * Fully background-persistent daemon (`HidService`) operating with `foregroundServiceType="connectedDevice"`.
+  * Connects directly to bonded targets (e.g. Android phones, PCs, macOS, Linux).
+  * Direct keystroke injection (individual keycodes, modifiers) and high-speed ASCII text typing.
+  * Built-in Wireless Hak5 DuckyScript 3.0 runner executing `.duck` payload scripts without physical cables.
 
 ---
 

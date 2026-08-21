@@ -1,0 +1,333 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-hid
+# Advanced Android Bluetooth HID Device Keyboard & Keystroke Injection Engine
+#
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$(cd "${SCRIPT_DIR}/../lib" && pwd)"
+source "${LIB_DIR}/utils.sh" 2>/dev/null || {
+    COLOR_RESET="\033[0m"; COLOR_BOLD="\033[1m"; COLOR_RED="\033[31m"; COLOR_GREEN="\033[32m"; COLOR_YELLOW="\033[33m"; COLOR_CYAN="\033[36m"
+    log_info() { echo -e "${COLOR_CYAN}[*]${COLOR_RESET} $*"; }
+    log_success() { echo -e "${COLOR_GREEN}[+]${COLOR_RESET} $*"; }
+    log_warn() { echo -e "${COLOR_YELLOW}[!]${COLOR_RESET} $*"; }
+    log_error() { echo -e "${COLOR_RED}[-]${COLOR_RESET} $*"; }
+    print_header() { echo -e "\n${COLOR_BOLD}=== $* ===${COLOR_RESET}\n"; }
+}
+
+PKG="com.example.hidtest"
+SERVICE="${PKG}/.HidService"
+SRC_PROJECT="${HOME}/hid_test"
+
+ensure_root() {
+    if [[ $EUID -ne 0 ]] && ! command -v su &>/dev/null; then
+        log_error "Root access (su) is required for Bluetooth HID manipulation."
+        exit 1
+    fi
+}
+
+get_prop() {
+    su -c "getprop $1" 2>/dev/null | tr -d '\r\n'
+}
+
+set_prop() {
+    su -c "setprop $1 $2" 2>/dev/null
+}
+
+hid_status() {
+    local json_output=false
+    [[ "${1:-}" == "--json" || "${1:-}" == "-j" ]] && json_output=true
+
+    local bt_state
+    bt_state=$(su -c 'dumpsys bluetooth_manager | grep "curState="' 2>/dev/null | awk -F'=' '{print $2}' | tr -d '\r')
+    bt_state="${bt_state:-UNKNOWN}"
+
+    local hid_prop
+    hid_prop=$(get_prop "bluetooth.profile.hid.device.enabled")
+    hid_prop="${hid_prop:-false}"
+
+    local uhid_dev=false
+    if su -c "test -c /dev/uhid" 2>/dev/null; then
+        uhid_dev=true
+    fi
+
+    local srv_running=false
+    if su -c "dumpsys activity services $PKG 2>/dev/null | grep -q 'HidService'" 2>/dev/null; then
+        srv_running=true
+    fi
+
+    local bt_hid_profile=false
+    if su -c "dumpsys bluetooth_manager | grep -q 'Profile: HidDeviceService'" 2>/dev/null; then
+        bt_hid_profile=true
+    fi
+
+    if [[ "$json_output" == "true" ]]; then
+        cat << JSON_EOF
+{
+  "bluetooth_state": "$bt_state",
+  "hid_profile_property": $hid_prop,
+  "uhid_device_node": $uhid_dev,
+  "foreground_service_active": $srv_running,
+  "hid_device_registered": $bt_hid_profile
+}
+JSON_EOF
+        return 0
+    fi
+
+    print_header "Bluetooth HID Device Subsystem Status"
+    echo -e "  Bluetooth State      : ${COLOR_BOLD}${bt_state}${COLOR_RESET}"
+    echo -e "  HID Device Property  : ${COLOR_BOLD}${hid_prop}${COLOR_RESET}"
+    echo -e "  Kernel UHID Node     : $([ "$uhid_dev" = true ] && echo -e "${COLOR_GREEN}AVAILABLE (/dev/uhid)${COLOR_RESET}" || echo -e "${COLOR_RED}NOT PRESENT${COLOR_RESET}")"
+    echo -e "  Hard-Tools HID Daemon: $([ "$srv_running" = true ] && echo -e "${COLOR_GREEN}ACTIVE (Foreground Service)${COLOR_RESET}" || echo -e "${COLOR_YELLOW}INACTIVE${COLOR_RESET}")"
+    echo -e "  Bluetooth HID Stack  : $([ "$bt_hid_profile" = true ] && echo -e "${COLOR_GREEN}REGISTERED (HidDeviceService Running)${COLOR_RESET}" || echo -e "${COLOR_YELLOW}UNREGISTERED${COLOR_RESET}")"
+    
+    echo
+    echo -e "${COLOR_BOLD}Bonded Host Candidates:${COLOR_RESET}"
+    su -c 'dumpsys bluetooth_manager | grep -E "shim::record.*name:"' 2>/dev/null | sed -E 's/.*(xx:[^ ]+).*name:"([^"]+)".*/  • \2 (\1)/' || echo "  None"
+    echo
+}
+
+hid_enable() {
+    print_header "Enabling Bluetooth HID Device Subsystem"
+    ensure_root
+
+    log_info "Granting Bluetooth runtime permissions to $PKG..."
+    su -c "pm grant $PKG android.permission.BLUETOOTH_CONNECT" 2>/dev/null || true
+    su -c "pm grant $PKG android.permission.BLUETOOTH_ADVERTISE" 2>/dev/null || true
+    su -c "pm grant $PKG android.permission.POST_NOTIFICATIONS" 2>/dev/null || true
+
+    log_info "Setting system property bluetooth.profile.hid.device.enabled=true..."
+    set_prop "bluetooth.profile.hid.device.enabled" "true"
+
+    log_info "Starting persistent HidService foreground daemon..."
+    su -c "am start-foreground-service -n $SERVICE" >/dev/null 2>&1
+
+    sleep 1
+    log_success "Bluetooth HID Service initialized and advertising as 'Hard-Tools Keyboard'."
+}
+
+hid_disable() {
+    print_header "Disabling Bluetooth HID Device"
+    ensure_root
+
+    log_info "Stopping HidService..."
+    su -c "am force-stop $PKG" 2>/dev/null || true
+    log_success "Bluetooth HID Service stopped."
+}
+
+hid_connect() {
+    local target_mac="${1:-}"
+    print_header "Connecting HID Keyboard to Host"
+    ensure_root
+
+    hid_enable >/dev/null 2>&1
+
+    if [[ -n "$target_mac" ]]; then
+        log_info "Dispatching connect request to $target_mac..."
+        su -c "am start-foreground-service -n $SERVICE -a ${PKG}.ACTION_CONNECT --es mac '$target_mac'" >/dev/null 2>&1
+    else
+        log_info "Auto-connecting to bonded host device..."
+        su -c "am start-foreground-service -n $SERVICE -a ${PKG}.ACTION_CONNECT" >/dev/null 2>&1
+    fi
+    sleep 1
+    log_success "Connection command dispatched."
+}
+
+hid_disconnect() {
+    print_header "Disconnecting HID Link"
+    ensure_root
+    su -c "am start-foreground-service -n $SERVICE -a ${PKG}.ACTION_DISCONNECT" >/dev/null 2>&1
+    log_success "Disconnect command dispatched."
+}
+
+parse_modifiers() {
+    local combo="$1"
+    local mod=0
+    [[ "$combo" =~ (CTRL|CONTROL) ]] && (( mod |= 1 ))
+    [[ "$combo" =~ SHIFT ]] && (( mod |= 2 ))
+    [[ "$combo" =~ ALT ]] && (( mod |= 4 ))
+    [[ "$combo" =~ (GUI|WIN|COMMAND) ]] && (( mod |= 8 ))
+    echo "$mod"
+}
+
+hid_send_key() {
+    local input="$1"
+    local explicit_mod="${2:-}"
+    ensure_root
+
+    [[ -z "$input" ]] && { log_error "Usage: bt-hid key <name|char|combo> [modifier]"; return 1; }
+
+    local mod=0
+    local key="$input"
+
+    if [[ -n "$explicit_mod" ]]; then
+        mod="$explicit_mod"
+    elif [[ "$input" =~ \+ ]]; then
+        mod=$(parse_modifiers "$input")
+        key="${input##*+}"
+    fi
+
+    su -c "am start-foreground-service -n $SERVICE -a ${PKG}.ACTION_SEND_KEY --es key_str '$key' --ei modifier $mod" >/dev/null 2>&1
+}
+
+hid_send_text() {
+    local text="$1"
+    local delay="${2:-20}"
+    ensure_root
+
+    [[ -z "$text" ]] && { log_error "Usage: bt-hid type \"<text>\" [delay_ms]"; return 1; }
+
+    log_info "Typing ${#text} characters over Bluetooth HID (delay ${delay}ms)..."
+    su -c "am start-foreground-service -n $SERVICE -a ${PKG}.ACTION_SEND_TEXT --es text '$text' --ei delay $delay" >/dev/null 2>&1
+    log_success "Text transmission queued."
+}
+
+hid_ducky() {
+    local duck_file="$1"
+    ensure_root
+
+    [[ ! -f "$duck_file" ]] && { log_error "Payload file not found: $duck_file"; return 1; }
+
+    print_header "Executing Wireless DuckyScript over Bluetooth HID"
+    log_info "Payload: $duck_file"
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+        [[ -z "$line" || "$line" =~ ^REM ]] && continue
+
+        local cmd arg
+        cmd=$(echo "$line" | awk '{print $1}')
+        arg=$(echo "$line" | cut -d' ' -f2-)
+
+        case "$cmd" in
+            DELAY)
+                local ms="${arg:-100}"
+                local sec
+                sec=$(awk "BEGIN {print $ms/1000}")
+                sleep "$sec"
+                ;;
+            STRING)
+                hid_send_text "$arg" 20
+                sleep 0.1
+                ;;
+            ENTER|RETURN)
+                hid_send_key "ENTER" 0
+                sleep 0.05
+                ;;
+            GUI|WINDOWS|COMMAND)
+                if [[ -n "$arg" ]]; then
+                    hid_send_key "$arg" 8
+                else
+                    hid_send_key "GUI" 0
+                fi
+                sleep 0.1
+                ;;
+            CONTROL|CTRL)
+                if [[ -n "$arg" ]]; then
+                    hid_send_key "$arg" 1
+                else
+                    hid_send_key "CTRL" 0
+                fi
+                sleep 0.05
+                ;;
+            ALT)
+                if [[ -n "$arg" ]]; then
+                    hid_send_key "$arg" 4
+                else
+                    hid_send_key "ALT" 0
+                fi
+                sleep 0.05
+                ;;
+            SHIFT)
+                if [[ -n "$arg" ]]; then
+                    hid_send_key "$arg" 2
+                else
+                    hid_send_key "SHIFT" 0
+                fi
+                sleep 0.05
+                ;;
+            TAB|ESCAPE|ESC|BACKSPACE|SPACE|CAPSLOCK|UP|DOWN|LEFT|RIGHT|F[1-9]|F1[0-2])
+                hid_send_key "$cmd" 0
+                sleep 0.05
+                ;;
+            *)
+                if [[ "$cmd" =~ \+ ]]; then
+                    hid_send_key "$cmd"
+                else
+                    log_warn "Unknown Ducky command: $cmd"
+                fi
+                ;;
+        esac
+    done < "$duck_file"
+
+    log_success "DuckyScript execution completed."
+}
+
+hid_build_install() {
+    print_header "Rebuilding & Installing Bluetooth HID Daemon"
+    if [[ -d "$SRC_PROJECT" && -f "${SRC_PROJECT}/build_and_install.sh" ]]; then
+        cd "$SRC_PROJECT" && ./build_and_install.sh
+        cd - >/dev/null || true
+    else
+        log_error "Source project not found at $SRC_PROJECT"
+        return 1
+    fi
+}
+
+menu() {
+    while true; do
+        clear 2>/dev/null || true
+        hid_status
+        echo -e "  ${COLOR_BOLD}Bluetooth HID Keyboard Controller:${COLOR_RESET}"
+        echo "   1) Start / Enable HID Keyboard Service"
+        echo "   2) Connect to Bonded Host Device"
+        echo "   3) Disconnect HID Link"
+        echo "   4) Send Keystroke (Key Name / Letter / Combo e.g. CTRL+C)"
+        echo "   5) Type Custom String / Command"
+        echo "   6) Run Wireless DuckyScript Payload (.duck)"
+        echo "   7) Rebuild & Install HID APK from Source"
+        echo "   8) Stop / Disable HID Service"
+        echo
+        echo "   0) Back to Menu"
+        echo
+        read -rp "Choice: " choice
+        case "$choice" in
+            1) hid_enable; read -rp "Press Enter to continue..." ;;
+            2)
+                read -rp "Enter Target MAC (leave blank for auto): " tmac
+                hid_connect "$tmac"
+                read -rp "Press Enter to continue..." ;;
+            3) hid_disconnect; read -rp "Press Enter to continue..." ;;
+            4)
+                read -rp "Enter key or combo (e.g. 'a', 'ENTER', 'CTRL+C', 'GUI+R'): " k
+                hid_send_key "$k"
+                read -rp "Press Enter to continue..." ;;
+            5)
+                read -rp "Enter text to type: " txt
+                hid_send_text "$txt" 25
+                read -rp "Press Enter to continue..." ;;
+            6)
+                read -rp "Enter path to .duck file: " df
+                hid_ducky "$df"
+                read -rp "Press Enter to continue..." ;;
+            7) hid_build_install; read -rp "Press Enter to continue..." ;;
+            8) hid_disable; read -rp "Press Enter to continue..." ;;
+            0) break ;;
+            *) sleep 1 ;;
+        esac
+    done
+}
+
+case "${1:-}" in
+    status)     hid_status "${2:-}" ;;
+    enable|start) hid_enable ;;
+    disable|stop) hid_disable ;;
+    connect)    hid_connect "${2:-}" ;;
+    disconnect) hid_disconnect ;;
+    key|combo)  hid_send_key "${2:-}" "${3:-}" ;;
+    type|text)  hid_send_text "${2:-}" "${3:-20}" ;;
+    ducky)      hid_ducky "${2:-}" ;;
+    build|rebuild|install) hid_build_install ;;
+    menu|"")    menu ;;
+    *) echo "Usage: $0 {status [--json]|enable|disable|connect [MAC]|disconnect|key <name|combo>|type \"<text>\"|ducky <file.duck>|build|menu}" ;;
+esac

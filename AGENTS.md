@@ -163,6 +163,7 @@ hard-tools/
 | **UVC Webcam** | `usb_gadget/uvc.sh` | DroidSpaces | ✅ Done | `uvc.0` descriptor & test feed. |
 | **ADB Gadget** | `usb_gadget/adb.sh` | DroidSpaces | ✅ Done | Controls `ffs.adb`. |
 | **MTP / PTP** | `usb_gadget/mtp_ptp.sh` | DroidSpaces | ✅ Done | `ffs.mtp` & `ffs.ptp` mode. |
+| **Bluetooth HID Device** | `bluetooth/bt-hid` | Rooted Termux | ✅ Done | Turns phone into Bluetooth HID Keyboard. Keystroke injection & wireless DuckyScript runner. |
 | **Android BT Arsenal** | `bluetooth/bt-*` | Rooted Termux | ✅ Done | Full status, toggle, codecs, profiles, devices, PAN, watch. |
 | **Bluetooth Suite** | `bluetooth/bt_arsenal.sh` | Dual Runtime | ✅ Done | Bridges Android Bluetooth Arsenal & BlueZ stack. |
 | **Wi-Fi Diagnostics** | `network/wifi_diagnostics.sh` | DroidSpaces | ✅ Done | Automated wireless assessment. |
@@ -174,6 +175,7 @@ hard-tools/
 ## 6. Android Bluetooth Arsenal Usage & Observability Engine
 
 ### Core Utilities Overview
+- `bluetooth/bt-hid` : Advanced Bluetooth HID Device controller. Manages persistent `HidService` background daemon, connects to bonded targets, sends keystrokes/ASCII text strings, and executes wireless Hak5 DuckyScript payloads (`.duck`).
 - `bluetooth/bt-status` : Real-time power state, adapter MAC address, uptime, paired device count, and active A2DP/HFP sinks. Supports `--json`, `--raw`, and `--quiet`.
 - `bluetooth/bt-status-fast` : Sub-millisecond state querying via direct Binder fast path (`service call bluetooth_manager 3/6/7`).
 - `bluetooth/bt-toggle [on|off|toggle|ble-on|ble-off|reset|wait-on|wait-off]` : High-speed adapter power manipulation via `cmd bluetooth_manager`.

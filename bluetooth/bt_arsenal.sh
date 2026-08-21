@@ -118,13 +118,14 @@ menu() {
         echo "   8) PAN Network & Tethering State        (bt-pan)"
         echo "   9) Audio Codecs & A2DP Offload Engine   (bt-codecs)"
         echo "  10) Real-Time Live Bluetooth Monitor     (bt-watch)"
+        echo "  11) Bluetooth HID Keyboard / Ducky Injection (bt-hid)"
         echo
         echo -e "  ${COLOR_BOLD}BlueZ Linux Stack (Requires raw /dev/hci0 adapter):${COLOR_RESET}"
-        echo "  11) Classic Device Scan (hcitool scan)"
-        echo "  12) BLE Scan (hcitool lescan)"
-        echo "  13) L2CAP Ping Stress Test (l2ping)"
-        echo "  14) Spoof HCI Device Name"
-        echo "  15) Start BLE Advertisement Beacon"
+        echo "  12) Classic Device Scan (hcitool scan)"
+        echo "  13) BLE Scan (hcitool lescan)"
+        echo "  14) L2CAP Ping Stress Test (l2ping)"
+        echo "  15) Spoof HCI Device Name"
+        echo "  16) Start BLE Advertisement Beacon"
         echo
         echo "   0) Back to Main Menu"
         echo
@@ -161,11 +162,12 @@ menu() {
             8) call_bt_tool "bt-pan"; press_enter ;;
             9) call_bt_tool "bt-codecs"; press_enter ;;
             10) call_bt_tool "bt-watch" ;;
-            11) bt_scan; press_enter ;;
-            12) ble_scan; press_enter ;;
-            13) l2ping_flood; press_enter ;;
-            14) bt_spoof_name; press_enter ;;
-            15) ble_beacon_spam; press_enter ;;
+            11) call_bt_tool "bt-hid" ;;
+            12) bt_scan; press_enter ;;
+            13) ble_scan; press_enter ;;
+            14) l2ping_flood; press_enter ;;
+            15) bt_spoof_name; press_enter ;;
+            16) ble_beacon_spam; press_enter ;;
             0) break ;;
             *) c_red "Invalid option."; sleep 1 ;;
         esac
@@ -184,9 +186,10 @@ case "${1:-}" in
     pan)      call_bt_tool "bt-pan" ;;
     codecs)   call_bt_tool "bt-codecs" ;;
     watch)    call_bt_tool "bt-watch" "${2:-2}" ;;
+    hid)      call_bt_tool "bt-hid" "${2:-}" "${3:-}" ;;
     bluez-scan)   bt_scan ;;
     bluez-lescan) ble_scan ;;
     flood)        l2ping_flood ;;
     menu|"")      menu ;;
-    *) echo "Usage: $0 {fast|scan|devinfo|status|toggle|info|profiles|devices|pan|codecs|watch|menu}" ;;
+    *) echo "Usage: $0 {fast|scan|devinfo|status|toggle|info|profiles|devices|pan|codecs|watch|hid|menu}" ;;
 esac
