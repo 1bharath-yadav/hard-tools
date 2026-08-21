@@ -84,12 +84,17 @@ SPECIAL_KEYS = {
     'ALT': (MOD_LALT, 0),
 }
 
+import random
+
 class USBKeyboard:
-    def __init__(self, dev_path=None):
+    def __init__(self, dev_path=None, jitter=False, jitter_min=5, jitter_max=25):
         if dev_path is None:
             # Auto-detect keyboard hidg device
             dev_path = self._find_keyboard_dev()
         self.dev_path = dev_path
+        self.jitter = jitter
+        self.jitter_min = jitter_min
+        self.jitter_max = jitter_max
 
     def _find_keyboard_dev(self):
         for dev in ['/dev/hidg0', '/dev/hidg1', '/dev/hidg2']:
@@ -110,9 +115,12 @@ class USBKeyboard:
 
     def tap_key(self, mod, keycode, delay=0.015):
         self.send_report(mod, keycode)
-        time.sleep(delay)
+        eff_delay = delay
+        if self.jitter:
+            eff_delay += random.uniform(self.jitter_min, self.jitter_max) / 1000.0
+        time.sleep(eff_delay)
         self.release_all()
-        time.sleep(delay)
+        time.sleep(eff_delay)
 
     def write_string(self, text, char_delay=0.01):
         for ch in text:
@@ -120,7 +128,7 @@ class USBKeyboard:
                 mod, code = ASCII_TO_HID[ch]
                 self.tap_key(mod, code, delay=char_delay)
             else:
-                # Unsupported char fallback
+                # Basic ASCII fallback if upper/lower
                 pass
 
     def send_combo(self, combo_str, delay=0.02):
@@ -129,13 +137,17 @@ class USBKeyboard:
         keycodes = []
 
         for p in parts:
-            if p in ['GUI', 'WINDOWS', 'WIN', 'SUPER', 'COMMAND']:
+            if p in ['GUI', 'WINDOWS', 'WIN', 'SUPER', 'COMMAND', 'CMD', 'META']:
                 mod |= MOD_LGUI
-            elif p in ['CTRL', 'CONTROL']:
+            elif p in ['CTRL', 'CONTROL', 'LCTRL']:
                 mod |= MOD_LCTRL
-            elif p in ['SHIFT']:
+            elif p in ['RCTRL']:
+                mod |= MOD_RCTRL
+            elif p in ['SHIFT', 'LSHIFT']:
                 mod |= MOD_LSHIFT
-            elif p in ['ALT', 'OPTION']:
+            elif p in ['RSHIFT']:
+                mod |= MOD_RSHIFT
+            elif p in ['ALT', 'OPTION', 'LALT']:
                 mod |= MOD_LALT
             elif p in ['ALTGR', 'RALT']:
                 mod |= MOD_RALT
@@ -154,9 +166,12 @@ class USBKeyboard:
         k3 = keycodes[2] if len(keycodes) > 2 else 0
 
         self.send_report(mod, k1, k2, k3)
-        time.sleep(delay)
+        eff_delay = delay
+        if self.jitter:
+            eff_delay += random.uniform(self.jitter_min, self.jitter_max) / 1000.0
+        time.sleep(eff_delay)
         self.release_all()
-        time.sleep(delay)
+        time.sleep(eff_delay)
 
 
 class USBMouse:
@@ -237,13 +252,34 @@ class DuckyParser:
             cmd = parts[0].upper()
             args = parts[1] if len(parts) > 1 else ""
 
-            if cmd == "DEFAULT_DELAY" or cmd == "DEFAULTDELAY":
+            if cmd in ["DEFAULT_DELAY", "DEFAULTDELAY"]:
                 def_delay = float(args) / 1000.0
             elif cmd == "DELAY":
                 delay_ms = float(args) if args else 100
                 time.sleep(delay_ms / 1000.0)
+            elif cmd == "JITTER":
+                # JITTER <min_ms> <max_ms> or JITTER TRUE/FALSE
+                jparts = args.split()
+                if len(jparts) >= 2 and jparts[0].isdigit() and jparts[1].isdigit():
+                    self.kb.jitter = True
+                    self.kb.jitter_min = int(jparts[0])
+                    self.kb.jitter_max = int(jparts[1])
+                elif args.upper() in ["ON", "TRUE", "ENABLE", "ENABLED"]:
+                    self.kb.jitter = True
+                elif args.upper() in ["OFF", "FALSE", "DISABLE", "DISABLED"]:
+                    self.kb.jitter = False
+            elif cmd == "STRINGLN":
+                # Type string and send ENTER
+                self.kb.write_string(args)
+                time.sleep(def_delay)
+                self.kb.tap_key(0, 0x28) # ENTER
             elif cmd == "STRING":
                 self.kb.write_string(args)
+            elif cmd == "HOLD":
+                # Hold key/modifier without releasing
+                self._hold_key(args)
+            elif cmd in ["RELEASE", "RELEASE_ALL"]:
+                self.kb.release_all()
             elif cmd == "REPEAT":
                 count = int(args) if args.isdigit() else 1
                 for _ in range(count):
@@ -255,6 +291,19 @@ class DuckyParser:
             last_line = line
             time.sleep(def_delay)
 
+    def _hold_key(self, key_str):
+        mod = 0
+        p = key_str.strip().upper()
+        if p in ['GUI', 'WINDOWS', 'WIN', 'SUPER', 'COMMAND']:
+            mod = MOD_LGUI
+        elif p in ['CTRL', 'CONTROL']:
+            mod = MOD_LCTRL
+        elif p in ['SHIFT']:
+            mod = MOD_LSHIFT
+        elif p in ['ALT', 'OPTION']:
+            mod = MOD_LALT
+        self.kb.send_report(mod=mod)
+
 
 def main():
     parser = argparse.ArgumentParser(description="hard-tools HID Engine")
@@ -264,6 +313,7 @@ def main():
     p_type = subparsers.add_parser("type", help="Type plain text")
     p_type.add_argument("text", help="String to type")
     p_type.add_argument("--delay", type=float, default=0.01, help="Delay between characters")
+    p_type.add_argument("--jitter", action="store_true", help="Enable human typing jitter")
     p_type.add_argument("--dev", default=None, help="HID device path")
 
     p_key = subparsers.add_parser("key", help="Send a key combination (e.g. 'GUI r' or 'CTRL+ALT+DELETE')")
@@ -289,12 +339,13 @@ def main():
     # Ducky subcommands
     p_duck = subparsers.add_parser("ducky", help="Execute DuckyScript file")
     p_duck.add_argument("file", help="Path to .duck script")
+    p_duck.add_argument("--jitter", action="store_true", help="Enable human keystroke jitter")
     p_duck.add_argument("--dev", default=None, help="HID device path")
 
     args = parser.parse_args()
 
     if args.subcommand == "type":
-        kb = USBKeyboard(args.dev)
+        kb = USBKeyboard(args.dev, jitter=args.jitter)
         kb.write_string(args.text, char_delay=args.delay)
     elif args.subcommand == "key":
         kb = USBKeyboard(args.dev)
@@ -309,7 +360,7 @@ def main():
         m = USBMouse(args.dev)
         m.jiggle(interval=args.interval, distance=args.dist)
     elif args.subcommand == "ducky":
-        kb = USBKeyboard(args.dev)
+        kb = USBKeyboard(args.dev, jitter=args.jitter)
         dp = DuckyParser(kb)
         dp.run_file(args.file)
     else:

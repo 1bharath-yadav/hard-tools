@@ -78,6 +78,7 @@ Android does **not** expose a standard Linux BlueZ socket stack (`/dev/hci0`, `h
 > 3. **Consolidated HID Controller (`usb_gadget/hid.sh`)**: Keyboard and Pointer (touchpad/mouse) are consolidated into `usb_gadget/hid.sh` using dynamic device discovery (`cat $G/functions/hid.*/dev` -> `/dev/hidg*`).
 > 4. **Shebang Preservation**: Do NOT modify shebangs in `launcher.sh` or core gadget scripts in a way that breaks DroidSpaces Arch Linux execution.
 > 5. **Self-Contained & Clean Exit**: Every script must support both non-interactive execution (`start`, `stop`, `status`) and interactive UI. No background processes or dangling symlinks should remain after stopping a module.
+> 6. **Hardware Endpoint Limits (Avoid Over-Stacking)**: Qualcomm DWC3 UDC controller has strict physical endpoint limits. Never link more than 2 lightweight functions simultaneously (e.g., RNDIS + KB is safe; do NOT stack Mass Storage + UVC + RNDIS + HID together), as exhausting hardware endpoints triggers a Qualcomm kernel panic/reboot. Test features in isolation.
 
 ---
 
@@ -117,29 +118,31 @@ hard-tools/
 ├── usb_gadget/                # Core USB Gadget Engines & Controllers
 │   ├── mass_storage_manager.sh# [DO NOT MODIFY] Working USB Mass Storage manager
 │   ├── hid.sh                 # Consolidated USB HID Controller (Keyboard, Touchpad, Jiggler)
+│   ├── chameleon.sh           # USB Chameleon: Dynamic VID/PID & Descriptor Cloner
+│   ├── composite.sh           # Composite Multi-Gadget Stacking Engine (Ghost Drive, Auto-Pwn)
+│   ├── badusb.sh              # Rogue gateway, aggressive DHCP hijack & captive portal
 │   ├── rndis.sh               # RNDIS Ethernet + DHCP/DNS router
-│   ├── badusb.sh              # Rogue gateway, captive portal & DNS spoofer
 │   ├── uvc.sh                 # UVC USB Webcam gadget
 │   ├── adb.sh                 # ADB gadget mode switch
 │   └── mtp_ptp.sh             # MTP/PTP media transfer gadget
 ├── network/                   # Network Filters & Diagnostics
-│   ├── netfilter.sh           # Iptables NAT/redirection & packet capture
+│   ├── netfilter.sh           # Iptables NAT/redirection, packet capture & Wireshark streamer
 │   └── wifi_diagnostics.sh    # Wi-Fi capability assessment
 ├── operator/                  # Operator Tooling & Recon
 │   ├── recon.sh               # System, USB, and network discovery
 │   ├── session.sh             # Terminal session recorder
-│   └── ducky.sh               # Hak5 DuckyScript payload runner
+│   └── ducky.sh               # Hak5 DuckyScript 3.0 multi-OS payload runner
 ├── lib/                       # Central Shared Helper Libraries
 │   ├── utils.sh               # Helpers (UDC, ConfigFS, colors, logging)
 │   ├── hid_keymap.sh          # 104-key USB keycode & modifier mapping
 │   ├── hid_touch.sh           # Precision Touchpad digitizer engine
-│   ├── hid_engine.py          # Python HID engine & Ducky parser
-│   └── rogue_portal.py        # Captive portal & credential logger
+│   ├── hid_engine.py          # Python HID engine & Ducky 3.0 parser with typing jitter
+│   └── rogue_portal.py        # Multi-template captive portal & credential logger
 ├── payloads/                  # DuckyScript payloads (.duck)
-│   ├── windows/               # Windows payloads
-│   ├── linux/                 # Linux payloads
-│   └── macos/                 # macOS payloads
-├── config/                    # Configuration templates (dnsmasq.conf, etc.)
+│   ├── windows/               # Windows staged payloads (Recon, Wi-Fi, UAC)
+│   ├── linux/                 # Linux staged payloads (Recon, SSH, Sudo)
+│   └── macos/                 # macOS staged payloads (Recon, Spotlight, Wi-Fi)
+├── config/                    # Configuration templates & stock descriptor backup
 └── images/                    # Local mass storage disk images
 ```
 
@@ -151,17 +154,20 @@ hard-tools/
 | :--- | :--- | :--- | :--- | :--- |
 | **Mass Storage** | `usb_gadget/mass_storage_manager.sh` | DroidSpaces | ✅ Done | Working great. DO NOT MODIFY. |
 | **USB HID Controller** | `usb_gadget/hid.sh` | DroidSpaces | ✅ Done | Dynamic mapping, 8-byte KB, 12-byte pointer, Jiggler, Ducky. |
-| **ADB Gadget** | `usb_gadget/adb.sh` | DroidSpaces | ✅ Done | Controls `ffs.adb`. |
+| **USB Chameleon** | `usb_gadget/chameleon.sh` | DroidSpaces | ✅ Done | Dynamic VID/PID & localized descriptor spoofing with stock backup. |
+| **Composite Engine** | `usb_gadget/composite.sh` | DroidSpaces | ✅ Done | Synchronized multi-gadget profiles: Ghost Drive, Stealth Jiggler, Auto-Pwn, Full Arsenal. |
+| **DuckyScript 3.0 Suite** | `operator/ducky.sh` | DroidSpaces | ✅ Done | Multi-OS curated payload matrix with anti-EDR human keystroke jitter. |
+| **BadUSB Rogue Gateway** | `usb_gadget/badusb.sh` | DroidSpaces | ✅ Done | RFC Option 3/6/121/249/252 route hijacking & multi-template captive portal. |
 | **RNDIS Ethernet** | `usb_gadget/rndis.sh` | DroidSpaces | ✅ Done | Uses `rndis.rndis` + `dnsmasq`. |
-| **BadUSB (MITM)** | `usb_gadget/badusb.sh` | DroidSpaces | ✅ Done | RNDIS + DNS spoofing / captive portal. |
+| **Netfilter & Sniff** | `network/netfilter.sh` | DroidSpaces | ✅ Done | Port redirection, packet sniffing & real-time remote Wireshark bridge. |
 | **UVC Webcam** | `usb_gadget/uvc.sh` | DroidSpaces | ✅ Done | `uvc.0` descriptor & test feed. |
+| **ADB Gadget** | `usb_gadget/adb.sh` | DroidSpaces | ✅ Done | Controls `ffs.adb`. |
+| **MTP / PTP** | `usb_gadget/mtp_ptp.sh` | DroidSpaces | ✅ Done | `ffs.mtp` & `ffs.ptp` mode. |
 | **Android BT Arsenal** | `bluetooth/bt-*` | Rooted Termux | ✅ Done | Full status, toggle, codecs, profiles, devices, PAN, watch. |
 | **Bluetooth Suite** | `bluetooth/bt_arsenal.sh` | Dual Runtime | ✅ Done | Bridges Android Bluetooth Arsenal & BlueZ stack. |
-| **Netfilter / Sniff** | `network/netfilter.sh` | DroidSpaces | ✅ Done | `iptables` port redirect + `tcpdump`. |
 | **Wi-Fi Diagnostics** | `network/wifi_diagnostics.sh` | DroidSpaces | ✅ Done | Automated wireless assessment. |
 | **Recon & Session** | `operator/recon.sh`, `session.sh`| DroidSpaces | ✅ Done | System discovery & session logging. |
-| **MTP / PTP** | `usb_gadget/mtp_ptp.sh` | DroidSpaces | ✅ Done | `ffs.mtp` & `ffs.ptp` mode. |
-| **Master Launcher** | `launcher.sh` | Dual Runtime | ✅ Done | Unified menu dashboard. |
+| **Master Launcher** | `launcher.sh` | Dual Runtime | ✅ Done | Unified menu dashboard with live module status indicators. |
 
 ---
 

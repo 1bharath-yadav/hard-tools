@@ -47,6 +47,7 @@ char_map(){
     case "$1" in
     [a-z]) echo "00:$(keycode "$1")";;
     [A-Z]) echo "02:$(keycode "$1")";;
+    [0-9]) echo "00:$(keycode "$1")";;
     ' ') echo 00:2c;; $'\n') echo 00:28;; $'\t') echo 00:2b;;
     '!') echo 02:1e;; '@') echo 02:1f;; '#') echo 02:20;; '$') echo 02:21;;
     '%') echo 02:22;; '^') echo 02:23;; '&') echo 02:24;; '*') echo 02:25;;

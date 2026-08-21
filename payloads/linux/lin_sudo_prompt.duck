@@ -1,0 +1,7 @@
+REM Linux Sudo Rights Verification
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+CTRL ALT t
+DELAY 800
+STRING sudo -l || echo "Sudo access requires credentials"
+ENTER

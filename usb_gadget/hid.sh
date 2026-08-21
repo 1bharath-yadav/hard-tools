@@ -69,6 +69,28 @@ link_if_missing(){
 }
 
 setup_extra_functions(){
+    # Standard 8-byte keyboard if missing
+    if [ ! -d "$F/hid.keyboard" ]; then
+        if mkdir "$F/hid.keyboard" 2>/dev/null; then
+            echo 1 > "$F/hid.keyboard/protocol"
+            echo 1 > "$F/hid.keyboard/subclass"
+            echo 8 > "$F/hid.keyboard/report_length"
+            printf "\x05\x01\x09\x06\xa1\x01\x05\x07\x19\xe0\x29\xe7\x15\x00\x25\x01\x75\x01\x95\x08\x81\x02\x95\x01\x75\x08\x81\x03\x95\x05\x75\x01\x05\x08\x19\x01\x29\x05\x91\x02\x95\x01\x75\x03\x91\x03\x95\x06\x75\x08\x15\x00\x25\x65\x05\x07\x19\x00\x29\x65\x81\x00\xc0" > "$F/hid.keyboard/report_desc" 2>/dev/null || true
+            echo keyboard >> "$STATE"
+        fi
+    fi
+
+    # 12-byte Precision Touchpad / Pointer digitizer if missing
+    if [ ! -d "$F/hid.touchpad" ]; then
+        if mkdir "$F/hid.touchpad" 2>/dev/null; then
+            echo 0 > "$F/hid.touchpad/protocol"
+            echo 0 > "$F/hid.touchpad/subclass"
+            echo 12 > "$F/hid.touchpad/report_length"
+            printf "\x05\x01\x09\x02\xa1\x01\x85\x01\x09\x01\xa1\x00\x05\x09\x19\x01\x29\x03\x15\x00\x25\x01\x95\x03\x75\x01\x81\x02\x95\x01\x75\x05\x81\x03\x05\x01\x09\x30\x09\x31\x15\x81\x25\x7f\x75\x08\x95\x02\x81\x06\x95\x08\x75\x08\x81\x03\xc0\xc0\x05\x0d\x09\x05\xa1\x01\x85\x04\x05\x0d\x09\x22\xa1\x02\x09\x42\x09\x32\x15\x00\x25\x01\x75\x01\x95\x02\x81\x02\x95\x06\x75\x01\x81\x03\x05\x01\x09\x30\x26\xc8\x0d\x75\x10\x95\x01\x81\x02\x09\x31\x26\xc8\x0d\x75\x10\x95\x01\x81\x02\x05\x0d\x09\x56\x26\xff\x7f\x75\x10\x95\x01\x81\x02\xc0\x09\x54\x25\x7f\x75\x08\x95\x01\x81\x02\x05\x09\x09\x01\x25\x01\x75\x01\x95\x01\x81\x02\x95\x07\x75\x01\x81\x03\x05\x0d\x09\x55\x25\x0a\x75\x08\x95\x01\xb1\x02\x95\x08\x75\x08\x81\x03\xc0" > "$F/hid.touchpad/report_desc" 2>/dev/null || true
+            echo touchpad >> "$STATE"
+        fi
+    fi
+
     # Standard 5-byte relative mouse if kernel allows dynamic creation
     if [ ! -d "$F/hid.mouse" ]; then
         if mkdir "$F/hid.mouse" 2>/dev/null; then
@@ -98,9 +120,9 @@ start(){
     [ -d "$C" ] || die "$C missing"
     : > "$STATE"
     echo none > "$G/UDC" 2>/dev/null || true
+    setup_extra_functions
     link_if_missing hid.keyboard
     link_if_missing hid.touchpad
-    setup_extra_functions
     [ -d "$F/hid.mouse" ] && link_if_missing hid.mouse
     [ -d "$F/hid.consumer" ] && link_if_missing hid.consumer
     echo "$UDC" > "$G/UDC" || die "UDC bind failed"

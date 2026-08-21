@@ -1,0 +1,10 @@
+REM macOS Wi-Fi Network & Interface Reconnaissance
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+GUI SPACE
+DELAY 500
+STRING Terminal
+ENTER
+DELAY 1000
+STRING networksetup -listallhardwareports; networksetup -getairportnetwork en0 2>/dev/null || networksetup -getairportnetwork en1 2>/dev/null
+ENTER

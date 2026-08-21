@@ -1,0 +1,4 @@
+REM Windows Workstation Lock
+REM Hard-Tools BadUSB Arsenal
+DELAY 500
+GUI l

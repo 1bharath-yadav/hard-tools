@@ -1,0 +1,10 @@
+REM macOS Detailed Reconnaissance
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+GUI SPACE
+DELAY 500
+STRING Terminal
+ENTER
+DELAY 1200
+STRING (echo "=== MACOS SYSTEM & HARDWARE ==="; uname -a; whoami; system_profiler SPHardwareDataType; echo "=== NETWORK & ROUTING ==="; ifconfig; netstat -rn) > /tmp/mac_recon.txt && head -n 30 /tmp/mac_recon.txt
+ENTER

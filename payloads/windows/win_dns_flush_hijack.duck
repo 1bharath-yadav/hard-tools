@@ -1,0 +1,7 @@
+REM Windows DNS Flush & Adapter Gateway Re-query
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+GUI r
+DELAY 500
+STRING cmd /c "ipconfig /flushdns & ipconfig /renew & nslookup www.google.com"
+ENTER

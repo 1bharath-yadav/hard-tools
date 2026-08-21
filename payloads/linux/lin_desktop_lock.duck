@@ -1,0 +1,5 @@
+REM Linux Desktop Lock Screen
+REM Hard-Tools BadUSB Arsenal
+DELAY 500
+STRING loginctl lock-session 2>/dev/null || xdg-screensaver lock 2>/dev/null || gnome-screensaver-command -l 2>/dev/null
+ENTER

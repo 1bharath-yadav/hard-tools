@@ -36,19 +36,18 @@ This document serves as the master feature catalog, capability matrix, and techn
 | :--- | :--- | :--- | :---: | :--- |
 | **USB Mass Storage** | DroidSpaces Arch | Kernel ConfigFS `mass_storage.0` | ✅ **Implemented** | Working USB Mass Storage manager supporting CD-ROM ISO & Flash images (`usb_gadget/mass_storage_manager.sh`). |
 | **Consolidated USB HID** | DroidSpaces Arch | Kernel ConfigFS `hid.keyboard` / `hid.touchpad` | ✅ **Implemented** | Consolidated 8-byte Keyboard, 12-byte Precision Touchpad, Mouse Jiggler, and Ducky parser (`usb_gadget/hid.sh`). |
-| **BadUSB Rogue Gateway** | DroidSpaces Arch | `rndis.rndis` + `dnsmasq` + `iptables` | ✅ **Implemented** | RNDIS USB network adapter with DNS spoofing and HTTP credential harvest portal (`usb_gadget/badusb.sh`). |
+| **USB Chameleon (VID/PID Spoof)** | DroidSpaces Arch | Dynamic ConfigFS Descriptor Rewriter | ✅ **Implemented** | Spoofs vendor/product IDs (Apple, Logitech, Dell, SanDisk, Microsoft, Corsair, Kingston) to bypass USB endpoint whitelisting / EDR (`usb_gadget/chameleon.sh`). |
+| **Composite Multi-Gadget Engine** | DroidSpaces Arch | Multi-Function ConfigFS Stack | ✅ **Implemented** | One-click arming of synchronized attack profiles: Ghost Drive, Stealth Jiggler, BadUSB Auto-Pwn, Full Arsenal (`usb_gadget/composite.sh`). |
+| **Weaponized Ducky 3.0 Arsenal** | DroidSpaces Arch | Multi-OS Staged Keystroke Engine | ✅ **Implemented** | Curated multi-stage automated payload suite for Windows 10/11, Linux, macOS with human typing jitter (`operator/ducky.sh` & `lib/hid_engine.py`). |
+| **BadUSB Rogue Gateway Hijack** | DroidSpaces Arch | `rndis.rndis` + `dnsmasq` + `iptables` | ✅ **Implemented** | RFC Option 3/6/121/249/252 default route hijacking, wildcard DNS, and multi-template captive portal (`usb_gadget/badusb.sh` & `lib/rogue_portal.py`). |
 | **RNDIS USB Ethernet** | DroidSpaces Arch | Kernel ConfigFS `rndis.rndis` | ✅ **Implemented** | Provides USB Ethernet tethering and local DHCP router gateway to host (`usb_gadget/rndis.sh`). |
+| **Live PCAP Remote Streamer** | DroidSpaces Arch | `tcpdump` + Netcat / Remote Wireshark | ✅ **Implemented** | Streams real-time PCAP packet capture from `usb0` interface directly to a remote Wireshark listener (`network/netfilter.sh`). |
+| **Transparent Port Redirection** | DroidSpaces Arch | `iptables` REDIRECT + Sniffer | ✅ **Implemented** | Transparent port 80/8080 interception, DNS query sniffing, and plaintext credential harvesting (`network/netfilter.sh`). |
 | **UVC USB Webcam** | DroidSpaces Arch | Kernel ConfigFS `uvc.0` | ✅ **Implemented** | Emulates USB Video Class (UVC) webcam device and streaming feed (`usb_gadget/uvc.sh`). |
 | **ADB Gadget Switch** | DroidSpaces Arch | Kernel ConfigFS `ffs.adb` | ✅ **Implemented** | Seamless switching between USB Gadget modes and Android Debug Bridge (`usb_gadget/adb.sh`). |
 | **MTP / PTP Media Mode** | DroidSpaces Arch | Kernel ConfigFS `ffs.mtp` / `ffs.ptp` | ✅ **Implemented** | Emulates Media Transfer Protocol and Picture Transfer Protocol (`usb_gadget/mtp_ptp.sh`). |
-| **Netfilter & Sniffer** | DroidSpaces Arch | Linux `iptables` + `tcpdump` | ✅ **Implemented** | Port redirection, NAT forwarding, and packet capture on USB network interfaces (`network/netfilter.sh`). |
 | **Master TUI Launcher** | Dual Runtime | Interactive ANSI Bash Dashboard | ✅ **Implemented** | Central unified terminal UI with real-time gadget and Bluetooth status indicators (`launcher.sh`). |
 | **Android Bluetooth Arsenal** | Rooted Termux | `android.bluetooth.IBluetoothManager` | ✅ **Implemented** | 22 dedicated tools for fast Binder querying, real-time scan telemetry, security auditing, codecs, and PAN. |
-| **USB Chameleon (VID/PID Spoof)** | DroidSpaces Arch | Dynamic ConfigFS Descriptor Rewriter | 🛠️ **Planned** | Spoofs vendor/product IDs (Apple, Logitech, Dell, SanDisk) to bypass USB endpoint whitelisting / EDR. |
-| **Multi-OS Staged Ducky Payloads** | DroidSpaces Arch | Hak5 DuckyScript 3.0 Engine | 🛠️ **Planned** | Curated multi-stage automated payload matrix for Windows 10/11, Linux, and macOS target hosts. |
-| **Advanced Gateway Hijack** | DroidSpaces Arch | Aggressive DHCP Options + DNS Poisoning | 🛠️ **Planned** | Option 3 `0.0.0.0/0` default route hijacking, Option 121 static routes, and transparent proxying. |
-| **Live PCAP Remote Streamer** | DroidSpaces Arch | `tcpdump` + Netcat / Remote Wireshark | 🛠️ **Planned** | Streams real-time PCAP packet capture from `usb0` interface directly to a remote Wireshark listener. |
-| **Transparent SSL / Port Proxy** | DroidSpaces Arch | `iptables` REDIRECT + Local Logger | 🛠️ **Planned** | Transparent port 80/8080 interception and real-time credential dump tables. |
 | **External OTG Wi-Fi / Dongles** | DroidSpaces Arch | USB OTG Host Kernel Modules | ❌ **Excluded** | Wi-Fi packet injection / external dongles explicitly out of scope (no external hardware reliance). |
 
 ---
