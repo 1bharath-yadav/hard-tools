@@ -80,11 +80,14 @@ unbind_udc() {
     if [[ -n "${cur_udc}" ]]; then
         log_info "Unbinding gadget from UDC (${cur_udc})..."
         sudo sh -c "echo '' > '${UDC_FILE}'" 2>/dev/null || true
-        sleep 0.3
-        if is_gadget_bound; then
-            log_warn "UDC still bound, retrying forced unbind..."
+        sleep 0.5
+        local retries=0
+        while is_gadget_bound && [[ $retries -lt 5 ]]; do
+            log_warn "UDC still bound, retrying unbind (attempt $((retries+1)))..."
             sudo sh -c "echo '' > '${UDC_FILE}'" 2>/dev/null || true
-        fi
+            sleep 0.5
+            ((retries++))
+        done
         log_success "Gadget unbound."
     else
         log_info "Gadget already unbound."
@@ -110,6 +113,7 @@ bind_udc() {
         fi
     fi
 
+    sleep 0.3
     log_info "Binding gadget to UDC: ${target_udc}..."
     if sudo sh -c "echo '${target_udc}' > '${UDC_FILE}'"; then
         sleep 0.5
@@ -155,6 +159,11 @@ link_function() {
         return 0
     fi
 
+    # Kernel requires UDC to be unbound before modifying config symlinks
+    if is_gadget_bound; then
+        unbind_udc
+    fi
+
     log_info "Linking ${func_name} -> ${CONFIG_DIR}/${link_name}..."
     if sudo ln -s "${func_path}" "${CONFIG_DIR}/${link_name}"; then
         log_success "Linked ${link_name}."
@@ -168,6 +177,11 @@ link_function() {
 unlink_function() {
     local link_name="$1"
     local found=0
+
+    # Kernel requires UDC to be unbound before modifying config symlinks
+    if is_gadget_bound; then
+        unbind_udc
+    fi
 
     # Try direct link name
     if sudo test -L "${CONFIG_DIR}/${link_name}"; then

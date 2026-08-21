@@ -146,21 +146,37 @@ capture_pcap_file() {
 
 # ----------------- Iptables Redirection & NAT -----------------
 
+get_iptables() {
+    if command -v iptables-legacy >/dev/null 2>&1; then
+        echo "iptables-legacy"
+    else
+        echo "iptables"
+    fi
+}
+
 redirect_port() {
-    print_header "Iptables Port Redirection / Transparent Proxy"
-    read -rp "Incoming port to intercept (e.g. 80): " in_port
-    read -rp "Target local destination port (e.g. 8080): " dest_port
+    local in_port="$1"
+    local dest_port="$2"
+    if [[ -z "$in_port" || -z "$dest_port" ]]; then
+        print_header "Iptables Port Redirection / Transparent Proxy"
+        read -rp "Incoming port to intercept (e.g. 80): " in_port
+        read -rp "Target local destination port (e.g. 8080): " dest_port
+    fi
     [[ -z "$in_port" || -z "$dest_port" ]] && return 1
 
+    local ipt
+    ipt=$(get_iptables)
     log_info "Adding iptables PREROUTING rule: Redirect port $in_port -> $dest_port..."
-    sudo iptables -t nat -A PREROUTING -p tcp --dport "$in_port" -j REDIRECT --to-ports "$dest_port"
+    sudo "${ipt}" -t nat -A PREROUTING -p tcp --dport "$in_port" -j REDIRECT --to-ports "$dest_port"
     log_success "Port redirection active (Port ${in_port} -> ${dest_port})."
 }
 
 flush_nat_rules() {
     print_header "Flush NAT & Redirection Rules"
-    sudo iptables -t nat -F PREROUTING 2>/dev/null || true
-    sudo iptables -t nat -F POSTROUTING 2>/dev/null || true
+    local ipt
+    ipt=$(get_iptables)
+    sudo "${ipt}" -t nat -F PREROUTING 2>/dev/null || true
+    sudo "${ipt}" -t nat -F POSTROUTING 2>/dev/null || true
     log_success "Flushed all iptables PREROUTING and POSTROUTING NAT tables."
 }
 
@@ -169,11 +185,13 @@ status() {
     echo -e "Remote PCAP Streamer: ${COLOR_MAGENTA}$(streamer_status)${COLOR_RESET}"
     echo -e "Default Interface:    ${COLOR_CYAN}$(detect_default_iface)${COLOR_RESET}"
     echo
+    local ipt
+    ipt=$(get_iptables)
     echo "--- Active NAT PREROUTING Rules ---"
-    sudo iptables -t nat -L PREROUTING -v -n 2>/dev/null || echo "N/A"
+    sudo "${ipt}" -t nat -L PREROUTING -v -n 2>/dev/null || echo "N/A"
     echo
     echo "--- Active NAT POSTROUTING Rules ---"
-    sudo iptables -t nat -L POSTROUTING -v -n 2>/dev/null || echo "N/A"
+    sudo "${ipt}" -t nat -L POSTROUTING -v -n 2>/dev/null || echo "N/A"
     echo
 }
 
@@ -206,13 +224,14 @@ menu() {
 }
 
 case "${1:-}" in
-    stream)  start_pcap_streamer "${2:-$DEFAULT_STREAM_PORT}" "${3:-}" ;;
+    stream)      start_pcap_streamer "${2:-$DEFAULT_STREAM_PORT}" "${3:-}" ;;
     stop-stream) stop_pcap_streamer ;;
-    dns)     sniff_dns ;;
-    http)    sniff_http ;;
-    pcap)    capture_pcap_file ;;
-    flush)   flush_nat_rules ;;
-    status)  status ;;
-    menu|"") menu ;;
-    *) echo "Usage: $0 {stream [port] [iface]|stop-stream|dns|http|pcap|flush|status|menu}" ;;
+    dns)         sniff_dns ;;
+    http)        sniff_http ;;
+    pcap)        capture_pcap_file ;;
+    redirect)    redirect_port "${2:-}" "${3:-}" ;;
+    flush)       flush_nat_rules ;;
+    status)      status ;;
+    menu|"")     menu ;;
+    *) echo "Usage: $0 {stream [port] [iface]|stop-stream|dns|http|pcap|redirect <in_port> <out_port>|flush|status|menu}" ;;
 esac

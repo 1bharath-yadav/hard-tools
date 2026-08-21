@@ -119,14 +119,15 @@ start(){
     [ -d "$G" ] || die "$G missing"
     [ -d "$C" ] || die "$C missing"
     : > "$STATE"
-    echo none > "$G/UDC" 2>/dev/null || true
+    echo "" > "$G/UDC" 2>/dev/null || true
+    sleep 0.5
     setup_extra_functions
     link_if_missing hid.keyboard
     link_if_missing hid.touchpad
     [ -d "$F/hid.mouse" ] && link_if_missing hid.mouse
     [ -d "$F/hid.consumer" ] && link_if_missing hid.consumer
     echo "$UDC" > "$G/UDC" || die "UDC bind failed"
-    sleep 1
+    sleep 0.5
     map_hid
     echo "HID READY"
     echo "  keyboard : $KEYDEV"
@@ -139,7 +140,8 @@ start(){
 stop(){
     need_root
     jiggle_stop 2>/dev/null
-    echo none > "$G/UDC" 2>/dev/null || true
+    echo "" > "$G/UDC" 2>/dev/null || true
+    sleep 0.5
     rm -f "$C/hid.keyboard" "$C/hid.touchpad" "$C/hid.mouse" "$C/hid.consumer"
     if grep -qx mouse "$STATE" 2>/dev/null; then
         rmdir "$F/hid.mouse" 2>/dev/null || true

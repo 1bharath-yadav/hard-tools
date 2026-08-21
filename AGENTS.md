@@ -208,3 +208,30 @@ hard-tools/
 - `TXN 06`: `isEnabled()` -> `0x01` (true)
 - `TXN 07`: `isBleScanAlwaysAvailable()` -> `0x01` (true)
 - `TXN 19`: `getAdapter()` -> returns active `IBluetooth` Binder token reference.
+
+---
+
+## 7. Verified Environment & Hardware Capability Discovery Matrix
+
+Following comprehensive inspection of the Android bind mounts (`/dev`, `/sys`, `/config`, `/vendor`, `/vendor_dlkm`, `/odm`, `/odm_dlkm`, `/product`, `/apex`, `/system_ext`), the hardware capabilities of this environment are classified as follows:
+
+| Subsystem | Hardware / Interface Node | Classification | Verified Details |
+| :--- | :--- | :---: | :--- |
+| **USB Gadget Subsystem** | `/config/usb_gadget/g1` / `a600000.dwc3` | `VERIFIED` | Qualcomm DWC3 SuperSpeed UDC controller, ConfigFS root, dynamically manageable endpoints. |
+| **USB HID Keystroke Injection** | `/dev/hidg0` (`hid.keyboard`) | `VERIFIED` | 8-byte standard USB keyboard with anti-EDR typing jitter & DuckyScript 3.0 execution. |
+| **USB Precision Touchpad** | `/dev/hidg1` (`hid.touchpad` / ID 04) | `VERIFIED` | Relative pointer & digitizer coordinate input for automated GUI manipulation. |
+| **Anti-Sleep Mouse Jiggler** | `/dev/hidg2` (`hid.mouse` / `hid.touchpad`)| `VERIFIED` | Background micro-delta oscillation preventing host sleep/idle timeout. |
+| **USB Chameleon VID/PID Cloner**| `/config/usb_gadget/g1/idVendor` | `VERIFIED` | Dynamic hardware spoofing (Apple Magic KB `05ac:024f`, Logitech, Dell) with stock backup. |
+| **RNDIS USB Ethernet Gateway** | `/config/usb_gadget/g1/functions/rndis.rndis` | `VERIFIED` | Virtual USB Ethernet adapter (`usb0`) providing DHCP leases and gateway routing. |
+| **BadUSB Rogue Portal** | `rndis.rndis` + `lib/rogue_portal.py` | `VERIFIED` | Aggressive RFC DHCP option override, wildcard DNS, captive portal credential logger. |
+| **Live Remote PCAP Streamer** | `usb0` -> TCP Port 9999 | `VERIFIED` | Real-time TCP socket streaming of USB network traffic to remote Wireshark listeners. |
+| **Netfilter Traffic Redirection**| `iptables-legacy` NAT PREROUTING | `VERIFIED` | Transparent TCP port redirection and table flushing on Android netfilter. |
+| **UVC USB Webcam Engine** | `/dev/video2` + `lib/uvc_daemon` | `VERIFIED` | Dedicated 26-byte UVC 1.00 compliant userspace daemon answering `UVCIOC_SETUP` events. |
+| **Bluetooth RF Controller** | `/sys/class/rfkill/rfkill0` | `VERIFIED` | Qualcomm WCN3990 Bluetooth chipset (`soc:bt_wcn3990`). |
+| **Bluetooth Vendor HAL** | `/vendor/lib64/hw/android.hardware.bluetooth@1.0-impl-qti.so` | `VERIFIED` | Qualcomm Bluetooth HAL implementation. |
+| **Bluetooth Audio Offload** | `/vendor/lib64/hw/vendor.qti.hardware.bluetooth_audio@2.1-impl.so` | `VERIFIED` | Qualcomm DSP hardware audio offload HAL (LDAC, aptX HD, AAC, SBC). |
+| **Cellular IPA Network** | `/dev/ipa`, `/dev/ipa_adpl` | `VERIFIED` | Qualcomm IP Accelerator and Accelerated Data Packet Logging. |
+| **Cellular RMNET Control** | `/dev/rmnet_ctrl` | `VERIFIED` | Qualcomm RMNET baseband modem management channel. |
+| **Baseband Shared Memory** | `/dev/smd8`, `/dev/smd11`, `/dev/smdcntl8` | `VERIFIED` | Qualcomm Shared Memory Driver (SMD) baseband communication nodes. |
+| **Camera Hardware HAL** | `/vendor/lib64/hw/camera.qcom.so`, `camera.xiaomi.so` | `VERIFIED` | Qualcomm and Xiaomi proprietary camera HAL libraries. |
+| **Kernel TraceFS Observability**| `/sys/kernel/tracing/` | `VERIFIED` | TraceFS with 141 event categories, dynamic kprobes, uprobes, and real-time `trace_pipe`. |

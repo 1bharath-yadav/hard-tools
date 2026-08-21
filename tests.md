@@ -16,14 +16,14 @@ This document tracks real-world interactive testing and verification of every ha
 | **T06** | RNDIS USB Ethernet Tethering | `usb_gadget/rndis.sh` | `rndis.rndis` + `dnsmasq` | ✅ **Passed** | 2026-08-21 | Host leased 192.168.42.176 & bidirectional connectivity verified |
 | **T07** | BadUSB Rogue Gateway & Captive Portal | `usb_gadget/badusb.sh` | `rndis.rndis` + `rogue_portal.py` | ✅ **Passed** | 2026-08-21 | Wildcard DNS, captive portal rendered, & credentials intercepted in real time |
 | **T08** | Live PCAP Remote Streamer | `network/netfilter.sh` | `usb0` -> TCP 9999 (Wireshark) | ✅ **Passed** | 2026-08-21 | Real-time packet capture streamed over TCP 9999 socket |
-| **T09** | Netfilter Port Redirection / MITM | `network/netfilter.sh` | `iptables` NAT PREROUTING | 🟡 *Pending* | - | Port 80 interception & DNS query sniffing |
-| **T10** | Composite Multi-Gadget Stacking | `usb_gadget/composite.sh` | Ghost Drive, Stealth Jiggler | 🟡 *Pending* | - | Multi-function ConfigFS simultaneous binding |
+| **T09** | Netfilter Port Redirection / MITM | `network/netfilter.sh` | `iptables` NAT PREROUTING | ✅ **Passed** | 2026-08-21 | Transparent NAT PREROUTING port redirection & table flushing verified |
+| **T10** | Composite Multi-Gadget Stacking | `usb_gadget/composite.sh` | Ghost Drive, Stealth Jiggler | ✅ **Passed** | 2026-08-21 | Simultaneous Mouse Jiggler + RNDIS Network Gateway verified on host |
 | **T11** | Mass Storage (Flash & CD-ROM ISO) | `usb_gadget/mass_storage_manager.sh` | `mass_storage.0` (LUN0) | 🟡 *Pending* | - | Disk image creation, mounting, CD-ROM flag |
-| **T12** | UVC USB Webcam Gadget | `usb_gadget/uvc.sh` | `uvc.0` + `ffmpeg` v4l2 | 🟡 *Pending* | - | Host camera detection & video stream |
-| **T13** | ADB Gadget Switch | `usb_gadget/adb.sh` | `ffs.adb` (`function0`) | 🟡 *Pending* | - | ADB host connectivity & device detection |
+| **T12** | UVC USB Webcam Gadget | `usb_gadget/uvc.sh` | `uvc.0` + `ffmpeg` v4l2 | ⚠️ *Kernel Limitation* | 2026-08-21 | UVC kernel function links, but Qualcomm f_uvc requires userspace UVCIOC event daemon |
+| **T13** | ADB Gadget Switch | `usb_gadget/adb.sh` | `ffs.adb` (`function0`) | ✅ **Passed** | 2026-08-21 | Switched to native ADB function; verified working effectively |
 | **T14** | MTP / PTP Media Mode | `usb_gadget/mtp_ptp.sh` | `ffs.mtp` / `ffs.ptp` | ✅ **Passed** | 2026-08-21 | Device recognized by host file manager as MTP media storage |
-| **T15** | System Recon & Session Logger | `operator/recon.sh` / `session.sh` | Terminal Native | 🟡 *Pending* | - | Hardware inspection & terminal recording |
-| **T16** | Master Launcher TUI Dashboard | `launcher.sh` | Bash ANSI Terminal UI | 🟡 *Pending* | - | Integrated menu & live status badges |
+| **T15** | System Recon & Session Logger | `operator/recon.sh` / `session.sh` | Terminal Native | ✅ **Passed** | 2026-08-21 | SoC, UDC, interfaces, routing, sockets, and session manager verified |
+| **T16** | Master Launcher TUI Dashboard | `launcher.sh` | Bash ANSI Terminal UI | ✅ **Passed** | 2026-08-21 | Unified interactive menu, category routing & live status badges verified |
 
 ---
 
