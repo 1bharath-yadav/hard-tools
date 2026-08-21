@@ -2,12 +2,13 @@
 #
 # hard-tools: bluetooth/bt-hid
 # Advanced Android Bluetooth HID Device Keyboard & Keystroke Injection Engine
+# Supports Dynamic Bluetooth Chameleon (Apple, Logitech, Xiaomi, Microsoft, Dell)
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(cd "${SCRIPT_DIR}/../lib" && pwd)"
 source "${LIB_DIR}/utils.sh" 2>/dev/null || {
-    COLOR_RESET="\033[0m"; COLOR_BOLD="\033[1m"; COLOR_RED="\033[31m"; COLOR_GREEN="\033[32m"; COLOR_YELLOW="\033[33m"; COLOR_CYAN="\033[36m"
+    COLOR_RESET="\033[0m"; COLOR_BOLD="\033[1m"; COLOR_RED="\033[31m"; COLOR_GREEN="\033[32m"; COLOR_YELLOW="\033[33m"; COLOR_CYAN="\033[36m"; COLOR_MAGENTA="\033[35m"
     log_info() { echo -e "${COLOR_CYAN}[*]${COLOR_RESET} $*"; }
     log_success() { echo -e "${COLOR_GREEN}[+]${COLOR_RESET} $*"; }
     log_warn() { echo -e "${COLOR_YELLOW}[!]${COLOR_RESET} $*"; }
@@ -42,6 +43,10 @@ hid_status() {
     bt_state=$(su -c 'dumpsys bluetooth_manager | grep "curState="' 2>/dev/null | awk -F'=' '{print $2}' | tr -d '\r')
     bt_state="${bt_state:-UNKNOWN}"
 
+    local bt_name
+    bt_name=$(su -c 'cmd bluetooth_manager get-name 2>/dev/null || dumpsys bluetooth_manager | grep "name:" | head -n1' 2>/dev/null | tr -d '\r\n')
+    bt_name="${bt_name:-Default}"
+
     local hid_prop
     hid_prop=$(get_prop "bluetooth.profile.hid.device.enabled")
     hid_prop="${hid_prop:-false}"
@@ -65,6 +70,7 @@ hid_status() {
         cat << JSON_EOF
 {
   "bluetooth_state": "$bt_state",
+  "bluetooth_name": "$bt_name",
   "hid_profile_property": $hid_prop,
   "uhid_device_node": $uhid_dev,
   "foreground_service_active": $srv_running,
@@ -76,6 +82,7 @@ JSON_EOF
 
     print_header "Bluetooth HID Device Subsystem Status"
     echo -e "  Bluetooth State      : ${COLOR_BOLD}${bt_state}${COLOR_RESET}"
+    echo -e "  Active Bluetooth Name: ${COLOR_MAGENTA}${bt_name}${COLOR_RESET}"
     echo -e "  HID Device Property  : ${COLOR_BOLD}${hid_prop}${COLOR_RESET}"
     echo -e "  Kernel UHID Node     : $([ "$uhid_dev" = true ] && echo -e "${COLOR_GREEN}AVAILABLE (/dev/uhid)${COLOR_RESET}" || echo -e "${COLOR_RED}NOT PRESENT${COLOR_RESET}")"
     echo -e "  Hard-Tools HID Daemon: $([ "$srv_running" = true ] && echo -e "${COLOR_GREEN}ACTIVE (Foreground Service)${COLOR_RESET}" || echo -e "${COLOR_YELLOW}INACTIVE${COLOR_RESET}")"
@@ -103,7 +110,7 @@ hid_enable() {
     su -c "am start-foreground-service -n $SERVICE" >/dev/null 2>&1
 
     sleep 1
-    log_success "Bluetooth HID Service initialized and advertising as 'Hard-Tools Keyboard'."
+    log_success "Bluetooth HID Service initialized."
 }
 
 hid_disable() {
@@ -113,6 +120,29 @@ hid_disable() {
     log_info "Stopping HidService..."
     su -c "am force-stop $PKG" 2>/dev/null || true
     log_success "Bluetooth HID Service stopped."
+}
+
+hid_spoof() {
+    local profile="${1:-}"
+    local custom_name="${2:-}"
+    local custom_provider="${3:-}"
+    local custom_desc="${4:-}"
+    ensure_root
+
+    [[ -z "$profile" ]] && {
+        echo -e "${COLOR_BOLD}Usage:${COLOR_RESET} bt-hid spoof <profile|custom> [name] [provider] [description]"
+        echo -e "Available Profiles: ${COLOR_GREEN}apple${COLOR_RESET}, ${COLOR_GREEN}logitech${COLOR_RESET}, ${COLOR_GREEN}xiaomi${COLOR_RESET}, ${COLOR_GREEN}microsoft${COLOR_RESET}, ${COLOR_GREEN}dell${COLOR_RESET}, ${COLOR_YELLOW}stock${COLOR_RESET}, ${COLOR_CYAN}custom${COLOR_RESET}"
+        return 1
+    }
+
+    print_header "Bluetooth Chameleon: Spoofing Hardware Identity ($profile)"
+    hid_enable >/dev/null 2>&1
+
+    log_info "Dispatching hardware spoofing parameters to HidService..."
+    su -c "am start-foreground-service -n $SERVICE -a ${PKG}.ACTION_SPOOF --es profile '$profile' --es name '$custom_name' --es provider '$custom_provider' --es desc '$custom_desc' --ez set_bt_name true" >/dev/null 2>&1
+
+    sleep 1
+    log_success "Bluetooth Chameleon identity applied: $profile"
 }
 
 hid_connect() {
@@ -274,6 +304,41 @@ hid_build_install() {
     fi
 }
 
+menu_chameleon() {
+    while true; do
+        clear 2>/dev/null || true
+        print_header "Bluetooth Chameleon: Hardware Identity Spoofer"
+        echo -e "  Spoofs the Bluetooth Device Name & SDP Provider strings.\n"
+        echo "   1) Apple Inc. Magic Keyboard"
+        echo "   2) Logitech K380 / MX Keys Multi-Device"
+        echo "   3) Xiaomi Wireless Dual-Mode Keyboard"
+        echo "   4) Microsoft Bluetooth Ergonomic Keyboard"
+        echo "   5) Dell Premier Multi-Device Keyboard"
+        echo "   6) Custom Hardware Profile (Specify Name & Vendor)"
+        echo "   7) Restore Default 'Hard-Tools Keyboard'"
+        echo
+        echo "   0) Back to HID Menu"
+        echo
+        read -rp "Choice: " cchoice
+        case "$cchoice" in
+            1) hid_spoof "apple"; read -rp "Press Enter to continue..." ;;
+            2) hid_spoof "logitech"; read -rp "Press Enter to continue..." ;;
+            3) hid_spoof "xiaomi"; read -rp "Press Enter to continue..." ;;
+            4) hid_spoof "microsoft"; read -rp "Press Enter to continue..." ;;
+            5) hid_spoof "dell"; read -rp "Press Enter to continue..." ;;
+            6)
+                read -rp "Enter Device Name (e.g. 'Corsair K70 RGB'): " cname
+                read -rp "Enter Provider/Vendor (e.g. 'Corsair'): " cvendor
+                read -rp "Enter Description: " cdesc
+                hid_spoof "custom" "$cname" "$cvendor" "$cdesc"
+                read -rp "Press Enter to continue..." ;;
+            7) hid_spoof "stock"; read -rp "Press Enter to continue..." ;;
+            0) break ;;
+            *) sleep 1 ;;
+        esac
+    done
+}
+
 menu() {
     while true; do
         clear 2>/dev/null || true
@@ -282,11 +347,12 @@ menu() {
         echo "   1) Start / Enable HID Keyboard Service"
         echo "   2) Connect to Bonded Host Device"
         echo "   3) Disconnect HID Link"
-        echo "   4) Send Keystroke (Key Name / Letter / Combo e.g. CTRL+C)"
-        echo "   5) Type Custom String / Command"
-        echo "   6) Run Wireless DuckyScript Payload (.duck)"
-        echo "   7) Rebuild & Install HID APK from Source"
-        echo "   8) Stop / Disable HID Service"
+        echo "   4) Bluetooth Chameleon (Spoof Apple / Logitech / Xiaomi...)"
+        echo "   5) Send Keystroke (Key Name / Letter / Combo e.g. CTRL+C)"
+        echo "   6) Type Custom String / Command"
+        echo "   7) Run Wireless DuckyScript Payload (.duck)"
+        echo "   8) Rebuild & Install HID APK from Source"
+        echo "   9) Stop / Disable HID Service"
         echo
         echo "   0) Back to Menu"
         echo
@@ -298,20 +364,21 @@ menu() {
                 hid_connect "$tmac"
                 read -rp "Press Enter to continue..." ;;
             3) hid_disconnect; read -rp "Press Enter to continue..." ;;
-            4)
+            4) menu_chameleon ;;
+            5)
                 read -rp "Enter key or combo (e.g. 'a', 'ENTER', 'CTRL+C', 'GUI+R'): " k
                 hid_send_key "$k"
                 read -rp "Press Enter to continue..." ;;
-            5)
+            6)
                 read -rp "Enter text to type: " txt
                 hid_send_text "$txt" 25
                 read -rp "Press Enter to continue..." ;;
-            6)
+            7)
                 read -rp "Enter path to .duck file: " df
                 hid_ducky "$df"
                 read -rp "Press Enter to continue..." ;;
-            7) hid_build_install; read -rp "Press Enter to continue..." ;;
-            8) hid_disable; read -rp "Press Enter to continue..." ;;
+            8) hid_build_install; read -rp "Press Enter to continue..." ;;
+            9) hid_disable; read -rp "Press Enter to continue..." ;;
             0) break ;;
             *) sleep 1 ;;
         esac
@@ -322,6 +389,7 @@ case "${1:-}" in
     status)     hid_status "${2:-}" ;;
     enable|start) hid_enable ;;
     disable|stop) hid_disable ;;
+    spoof|chameleon) hid_spoof "${2:-}" "${3:-}" "${4:-}" "${5:-}" ;;
     connect)    hid_connect "${2:-}" ;;
     disconnect) hid_disconnect ;;
     key|combo)  hid_send_key "${2:-}" "${3:-}" ;;
@@ -329,5 +397,5 @@ case "${1:-}" in
     ducky)      hid_ducky "${2:-}" ;;
     build|rebuild|install) hid_build_install ;;
     menu|"")    menu ;;
-    *) echo "Usage: $0 {status [--json]|enable|disable|connect [MAC]|disconnect|key <name|combo>|type \"<text>\"|ducky <file.duck>|build|menu}" ;;
+    *) echo "Usage: $0 {status [--json]|enable|disable|spoof <apple|logitech|xiaomi|microsoft|dell|custom>|connect [MAC]|disconnect|key <name|combo>|type \"<text>\"|ducky <file.duck>|build|menu}" ;;
 esac
