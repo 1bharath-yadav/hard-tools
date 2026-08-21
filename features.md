@@ -49,6 +49,9 @@ This document serves as the master feature catalog, capability matrix, and techn
 | **Master TUI Launcher** | Dual Runtime | Interactive ANSI Bash Dashboard | ✅ **Implemented** | Central unified terminal UI with real-time gadget and Bluetooth status indicators (`launcher.sh`). |
 | **Android Bluetooth Arsenal** | Rooted Termux | `android.bluetooth.IBluetoothManager` | ✅ **Implemented** | 22 dedicated tools for fast Binder querying, real-time scan telemetry, security auditing, codecs, and PAN. |
 | **Bluetooth HID Device (Wireless Ducky)** | Rooted Termux | `BluetoothHidDevice` + `btif_hd.cc` + `/dev/uhid` | ✅ **Implemented** | Turns phone into persistent Bluetooth HID Keyboard. Injects strings, keystrokes, and executes Hak5 DuckyScript wirelessly (`bluetooth/bt-hid`). |
+| **BTSnoop HCI Hardware Logger** | Rooted Termux | Qualcomm Bluetooth HAL Snoop Engine | ✅ **Implemented** | Captures raw baseband HCI frames into PCAP format with live TCP streaming (`bluetooth/bt-snoop`). |
+| **Kernel Ftrace & Dynamic Kprobes** | Rooted Termux | Linux TraceFS (`/sys/kernel/tracing`) | ✅ **Implemented** | Real-time kernel event streaming (syscalls, binder, net, sched) and dynamic kprobe function attachment (`operator/ktrace.sh`). |
+| **Passive Layer-2/3 Network Recon** | Rooted Termux | Raw Sockets / `libpcap` | ✅ **Implemented** | Passive ARP host mapping, DHCP request snooper, live DNS domain monitor, and socket UID attribution (`network/net_recon.sh`). |
 | **External OTG Wi-Fi / Dongles** | DroidSpaces Arch | USB OTG Host Kernel Modules | ❌ **Excluded** | Wi-Fi packet injection / external dongles explicitly out of scope (no external hardware reliance). |
 
 ---
@@ -86,7 +89,7 @@ This document serves as the master feature catalog, capability matrix, and techn
 
 ---
 
-### 3.2 Android Native Bluetooth Arsenal (Rooted Termux)
+### 3.2 Android Native Bluetooth Arsenal & Observability (Rooted Termux)
 
 The Bluetooth Arsenal operates natively via Android's `bluetooth_manager` system service (`android.bluetooth.IBluetoothManager`):
 
@@ -104,7 +107,8 @@ bluetooth/
 │   ├── bt-security            # Security auditor (Link key types, MITM, P-256 SC)
 │   └── bt-audio               # Audio stack, active sink routing & DSP offload mask
 ├── Tier 3: Wireless HID Device & Keystroke Injection
-│   └── bt-hid                 # Bluetooth HID Device Keyboard, Text Typer & Wireless DuckyScript
+│   ├── bt-hid                 # Bluetooth HID Device Keyboard, Text Typer & Wireless DuckyScript
+│   └── bt-snoop               # Qualcomm BTSnoop HCI Logger, PCAP Exporter & Live TCP Streamer
 ├── Tier 4: PAN Gateway
 │   ├── bt-pan                 # Personal Area Network (NAP/PANU) state & configuration
 │   └── bt-pan-status          # Dedicated PAN interface and gateway status
@@ -124,6 +128,19 @@ bluetooth/
   * Connects directly to bonded targets (e.g. Android phones, PCs, macOS, Linux).
   * Direct keystroke injection (individual keycodes, modifiers) and high-speed ASCII text typing.
   * Built-in Wireless Hak5 DuckyScript 3.0 runner executing `.duck` payload scripts without physical cables.
+
+* **Qualcomm BTSnoop HCI Logger & Wireshark Bridge (`bluetooth/bt-snoop`)**:
+  * Taps Qualcomm Bluetooth HAL (`vendor.bluetooth-1-0-qti`) to log 100% of raw HCI frames into `btsnoop_hci.log`.
+  * Exports Wireshark-compatible PCAP captures and streams live HCI packets over TCP port 9998.
+
+* **Kernel Ftrace & Dynamic Kprobes (`operator/ktrace.sh`)**:
+  * Real-time Linux kernel tracepoint streaming for syscalls (`raw_syscalls:*`), Binder IPC (`binder:*`), and networking (`net:*`).
+  * Dynamically attaches kprobes to any kernel function listed in `/proc/kallsyms` with live hit statistics.
+
+* **Passive Network Reconnaissance (`network/net_recon.sh`)**:
+  * Passive ARP monitoring for discovering active LAN IP/MAC devices without active scanning.
+  * Passive DHCP broadcast listener capturing hostnames and vendor class IDs.
+  * Real-time DNS query monitor and active socket-to-PID attribution.
 
 ---
 

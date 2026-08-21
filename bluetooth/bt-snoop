@@ -1,0 +1,204 @@
+#!/data/data/com.termux/files/usr/bin/bash
+#
+# hard-tools: bluetooth/bt-snoop
+# Qualcomm BTSnoop & HCI Packet Logging Manager
+#
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$(cd "${SCRIPT_DIR}/../lib" && pwd)"
+source "${LIB_DIR}/utils.sh" 2>/dev/null || {
+    COLOR_RESET="\033[0m"; COLOR_BOLD="\033[1m"; COLOR_RED="\033[31m"; COLOR_GREEN="\033[32m"; COLOR_YELLOW="\033[33m"; COLOR_CYAN="\033[36m"
+    log_info() { echo -e "${COLOR_CYAN}[*]${COLOR_RESET} $*"; }
+    log_success() { echo -e "${COLOR_GREEN}[+]${COLOR_RESET} $*"; }
+    log_warn() { echo -e "${COLOR_YELLOW}[!]${COLOR_RESET} $*"; }
+    log_error() { echo -e "${COLOR_RED}[-]${COLOR_RESET} $*"; }
+    print_header() { echo -e "\n${COLOR_BOLD}=== $* ===${COLOR_RESET}\n"; }
+}
+
+LOG_DIR="/data/misc/bluetooth/logs"
+SNOOP_FILE="${LOG_DIR}/btsnoop_hci.log"
+SNOOZ_FILE="${LOG_DIR}/btsnooz_hci.log"
+DEFAULT_EXPORT="${HOME}/btsnoop_$(date +%Y%m%d_%H%M%S).log"
+
+ensure_root() {
+    if [[ $EUID -ne 0 ]] && ! command -v su &>/dev/null; then
+        log_error "Root access (su) is required for BTSnoop configuration."
+        exit 1
+    fi
+}
+
+get_prop() {
+    su -c "getprop $1" 2>/dev/null | tr -d '\r\n'
+}
+
+set_prop() {
+    su -c "setprop $1 $2" 2>/dev/null
+}
+
+snoop_status() {
+    print_header "Bluetooth HCI BTSnoop Configuration"
+
+    local def_mode log_mode map_filter pbap_filter
+    def_mode=$(get_prop "persist.bluetooth.btsnoopdefaultmode")
+    log_mode=$(get_prop "persist.bluetooth.btsnooplogmode")
+    map_filter=$(get_prop "persist.bluetooth.snooplogfilter.profiles.map")
+    pbap_filter=$(get_prop "persist.bluetooth.snooplogfilter.profiles.pbap")
+
+    def_mode="${def_mode:-disabled}"
+    log_mode="${log_mode:-disabled}"
+
+    echo -e "  BTSnoop Default Mode : ${COLOR_BOLD}${def_mode}${COLOR_RESET}"
+    echo -e "  BTSnoop Log Mode     : ${COLOR_BOLD}${log_mode}${COLOR_RESET}"
+    echo -e "  MAP Profile Filter   : ${map_filter:-disabled}"
+    echo -e "  PBAP Profile Filter  : ${pbap_filter:-disabled}"
+
+    echo
+    echo -e "${COLOR_BOLD}Active Log Files:${COLOR_RESET}"
+    local found=false
+    for f in "$SNOOP_FILE" "${SNOOP_FILE}.last" "$SNOOZ_FILE" "${SNOOZ_FILE}.last" "/sdcard/btsnoop_hci.log"; do
+        if su -c "test -f $f" 2>/dev/null; then
+            local size
+            size=$(su -c "stat -c '%s bytes (%y)' $f" 2>/dev/null)
+            echo -e "  • ${COLOR_GREEN}${f}${COLOR_RESET} -> ${size}"
+            found=true
+        fi
+    done
+    [[ "$found" = false ]] && echo "  None found."
+    echo
+}
+
+snoop_enable() {
+    local mode="${1:-full}"
+    print_header "Enabling BTSnoop HCI Logging ($mode)"
+    ensure_root
+
+    set_prop "persist.bluetooth.btsnoopdefaultmode" "$mode"
+    set_prop "persist.bluetooth.btsnooplogmode" "$mode"
+    
+    log_info "BTSnoop properties set to '$mode'."
+    log_warn "Note: Bluetooth stack must be restarted for logging changes to take full effect."
+
+    read -rp "Restart Bluetooth stack now? [Y/n]: " ans
+    if [[ ! "$ans" =~ ^[Nn]$ ]]; then
+        su -c "svc bluetooth disable"
+        sleep 2
+        su -c "svc bluetooth enable"
+        sleep 3
+        log_success "Bluetooth stack restarted with BTSnoop logging active."
+    fi
+}
+
+snoop_disable() {
+    print_header "Disabling BTSnoop HCI Logging"
+    ensure_root
+
+    set_prop "persist.bluetooth.btsnoopdefaultmode" "disabled"
+    set_prop "persist.bluetooth.btsnooplogmode" "disabled"
+    log_success "BTSnoop properties set to 'disabled'."
+}
+
+snoop_clear() {
+    print_header "Clearing BTSnoop Log Files"
+    ensure_root
+
+    su -c "rm -f ${LOG_DIR}/*snoop*.log* ${LOG_DIR}/*snooz*.log* /sdcard/btsnoop_hci.log 2>/dev/null" || true
+    log_success "Log files cleared."
+}
+
+snoop_export() {
+    local dest="${1:-$DEFAULT_EXPORT}"
+    print_header "Exporting BTSnoop Log"
+    ensure_root
+
+    local src=""
+    for f in "$SNOOP_FILE" "$SNOOZ_FILE" "${SNOOP_FILE}.last" "${SNOOZ_FILE}.last" "/sdcard/btsnoop_hci.log"; do
+        if su -c "test -s $f" 2>/dev/null; then
+            src="$f"
+            break
+        fi
+    done
+
+    if [[ -z "$src" ]]; then
+        log_error "No non-empty BTSnoop log file found to export."
+        return 1
+    fi
+
+    log_info "Copying $src to $dest..."
+    su -c "cp '$src' '$dest' && chmod 666 '$dest'"
+    log_success "BTSnoop log exported successfully to: $dest"
+    log_info "Open this file in Wireshark for deep Bluetooth protocol inspection."
+}
+
+snoop_stream() {
+    local port="${1:-9998}"
+    print_header "Starting BTSnoop Live Streamer (Wireshark Bridge)"
+    ensure_root
+
+    local src=""
+    for f in "$SNOOP_FILE" "$SNOOZ_FILE" "/sdcard/btsnoop_hci.log"; do
+        if su -c "test -f $f" 2>/dev/null; then
+            src="$f"
+            break
+        fi
+    done
+
+    if [[ -z "$src" ]]; then
+        log_error "No active BTSnoop log file found to stream. Try enabling snoop first."
+        return 1
+    fi
+
+    log_info "Target Log: $src | Listening Port: $port"
+    log_info "Connect from Wireshark PC with: nc <PHONE_IP> $port | wireshark -k -i -"
+
+    if command -v ncat >/dev/null 2>&1; then
+        su -c "tail -f -c +1 '$src' | ncat -l -p '$port' --keep-open"
+    elif command -v nc >/dev/null 2>&1; then
+        su -c "tail -f -c +1 '$src' | nc -l -p '$port'"
+    else
+        log_error "Neither ncat nor nc is installed in Termux."
+        return 1
+    fi
+}
+
+menu() {
+    while true; do
+        clear 2>/dev/null || true
+        snoop_status
+        echo -e "  ${COLOR_BOLD}Qualcomm BTSnoop HCI Manager:${COLOR_RESET}"
+        echo "   1) Enable Full BTSnoop Logging (Wireshark Ready)"
+        echo "   2) Disable BTSnoop Logging"
+        echo "   3) Export Snoop Log to Storage / Home"
+        echo "   4) Clear Existing Snoop Logs"
+        echo "   5) Stream Live BTSnoop over TCP (Port 9998)"
+        echo
+        echo "   0) Back to Menu"
+        echo
+        read -rp "Choice: " choice
+        case "$choice" in
+            1) snoop_enable; read -rp "Press Enter to continue..." ;;
+            2) snoop_disable; read -rp "Press Enter to continue..." ;;
+            3)
+                read -rp "Enter destination path [$DEFAULT_EXPORT]: " exp
+                snoop_export "${exp:-$DEFAULT_EXPORT}"
+                read -rp "Press Enter to continue..." ;;
+            4) snoop_clear; read -rp "Press Enter to continue..." ;;
+            5)
+                read -rp "Enter stream port [9998]: " prt
+                snoop_stream "${prt:-9998}"
+                read -rp "Press Enter to continue..." ;;
+            0) break ;;
+            *) sleep 1 ;;
+        esac
+    done
+}
+
+case "${1:-}" in
+    status)     snoop_status ;;
+    enable|on)  snoop_enable "${2:-full}" ;;
+    disable|off) snoop_disable ;;
+    clear|clean) snoop_clear ;;
+    export)     snoop_export "${2:-}" ;;
+    stream)     snoop_stream "${2:-9998}" ;;
+    menu|"")    menu ;;
+    *) echo "Usage: $0 {status|enable|disable|clear|export [dest]|stream [port]|menu}" ;;
+esac

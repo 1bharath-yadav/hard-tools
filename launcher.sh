@@ -100,6 +100,14 @@ get_module_status() {
             else
                 printf "${COLOR_DIM}[OFF]${COLOR_RESET}"
             fi ;;
+        bt_snoop)
+            local snoop_mode
+            snoop_mode=$(su -c "getprop persist.bluetooth.btsnoopdefaultmode" 2>/dev/null | tr -d '\r\n')
+            if [[ "$snoop_mode" == "full" ]]; then
+                printf "${COLOR_GREEN}[LOGGING]${COLOR_RESET}"
+            else
+                printf "${COLOR_DIM}[OFF]${COLOR_RESET}"
+            fi ;;
     esac
 }
 
@@ -139,17 +147,20 @@ show_main_menu() {
     echo -e "   8) UVC USB Webcam          $(get_module_status uvc)"
     echo -e "   9) MTP / PTP Media Mode    $(get_module_status mtp)"
     echo
-    echo -e "  ${COLOR_BOLD}Offensive Payloads & Wireless Bluetooth:${COLOR_RESET}"
+    echo -e "  ${COLOR_BOLD}Wireless Bluetooth, Packet Capture & Observability:${COLOR_RESET}"
     echo -e "  10) Weaponized Ducky 3.0    ${COLOR_DIM}[MULTI-OS STAGED ARSENAL]${COLOR_RESET}"
     echo -e "  11) Netfilter & Sniffer     $(get_module_status pcap_streamer)  [IPTABLES / WIRESHARK BRIDGE]"
-    echo -e "  12) Bluetooth HID Device    $(get_module_status bt_hid)  [WIRELESS KEYBOARD / DUCKY INJECTION]"
-    echo -e "  13) Bluetooth Arsenal Suite ${COLOR_DIM}[ANDROID BT / BINDER ARSENAL]${COLOR_RESET}"
-    echo -e "  14) System & Bus Recon      ${COLOR_DIM}[operator/recon.sh]${COLOR_RESET}"
-    echo -e "  15) Terminal Session Logger ${COLOR_DIM}[operator/session.sh]${COLOR_RESET}"
+    echo -e "  12) Passive Network Recon   ${COLOR_DIM}[ARP / DHCP / DNS / SOCKET TELEMETRY]${COLOR_RESET}"
+    echo -e "  13) Bluetooth HID Device    $(get_module_status bt_hid)  [WIRELESS KEYBOARD / DUCKY INJECTION]"
+    echo -e "  14) Bluetooth BTSnoop HCI   $(get_module_status bt_snoop)  [QUALCOMM HAL PCAP STREAMER]"
+    echo -e "  15) Bluetooth Arsenal Suite ${COLOR_DIM}[ANDROID BT / BINDER ARSENAL]${COLOR_RESET}"
+    echo -e "  16) Kernel Ftrace & Kprobes ${COLOR_DIM}[SYSCALL / BINDER / NET TRACING]${COLOR_RESET}"
+    echo -e "  17) System & Bus Recon      ${COLOR_DIM}[operator/recon.sh]${COLOR_RESET}"
+    echo -e "  18) Terminal Session Logger ${COLOR_DIM}[operator/session.sh]${COLOR_RESET}"
     echo
     echo -e "  ${COLOR_BOLD}System Operations:${COLOR_RESET}"
-    echo -e "  16) Emergency Unbind All USB Gadgets"
-    echo -e "  17) View ConfigFS Active Links"
+    echo -e "  19) Emergency Unbind All USB Gadgets"
+    echo -e "  20) View ConfigFS Active Links"
     echo -e "   0) Exit"
     echo
 }
@@ -171,7 +182,7 @@ show_active_configfs() {
 main() {
     while true; do
         show_main_menu
-        read -rp "Select option [0-17]: " opt
+        read -rp "Select option [0-20]: " opt
         case "$opt" in
             1)
                 if [[ -x "${MASS_STORAGE_BIN}" ]]; then
@@ -189,12 +200,15 @@ main() {
             9)  bash "${MTP_BIN}" ;;
             10) bash "${DUCKY_BIN}" ;;
             11) bash "${NETFILTER_BIN}" ;;
-            12) bash "${BT_DIR}/bt-hid" ;;
-            13) bash "${BT_BIN}" ;;
-            14) bash "${RECON_BIN}" ;;
-            15) bash "${SESSION_BIN}" ;;
-            16) emergency_unbind ;;
-            17) show_active_configfs ;;
+            12) bash "${NET_DIR}/net_recon.sh" ;;
+            13) bash "${BT_DIR}/bt-hid" ;;
+            14) bash "${BT_DIR}/bt-snoop" ;;
+            15) bash "${BT_BIN}" ;;
+            16) bash "${OP_DIR}/ktrace.sh" ;;
+            17) bash "${RECON_BIN}" ;;
+            18) bash "${SESSION_BIN}" ;;
+            19) emergency_unbind ;;
+            20) show_active_configfs ;;
             0|q|Q|exit)
                 c_cyan "Exiting hard-tools USB Arsenal. Happy Hacking!"
                 exit 0 ;;

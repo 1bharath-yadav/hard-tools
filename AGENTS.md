@@ -164,6 +164,9 @@ hard-tools/
 | **ADB Gadget** | `usb_gadget/adb.sh` | DroidSpaces | ✅ Done | Controls `ffs.adb`. |
 | **MTP / PTP** | `usb_gadget/mtp_ptp.sh` | DroidSpaces | ✅ Done | `ffs.mtp` & `ffs.ptp` mode. |
 | **Bluetooth HID Device** | `bluetooth/bt-hid` | Rooted Termux | ✅ Done | Turns phone into Bluetooth HID Keyboard. Keystroke injection & wireless DuckyScript runner. |
+| **BTSnoop HCI Logger** | `bluetooth/bt-snoop` | Rooted Termux | ✅ Done | Qualcomm HAL HCI packet logging, Wireshark PCAP export & live TCP streamer. |
+| **Kernel Ftrace & Kprobes** | `operator/ktrace.sh` | Rooted Termux | ✅ Done | Real-time syscall interception, Binder/Net event streaming & dynamic kprobes. |
+| **Passive Network Recon** | `network/net_recon.sh` | Rooted Termux | ✅ Done | Passive ARP mapping, DHCP host snooper, real-time DNS monitor & socket attribution. |
 | **Android BT Arsenal** | `bluetooth/bt-*` | Rooted Termux | ✅ Done | Full status, toggle, codecs, profiles, devices, PAN, watch. |
 | **Bluetooth Suite** | `bluetooth/bt_arsenal.sh` | Dual Runtime | ✅ Done | Bridges Android Bluetooth Arsenal & BlueZ stack. |
 | **Wi-Fi Diagnostics** | `network/wifi_diagnostics.sh` | DroidSpaces | ✅ Done | Automated wireless assessment. |
@@ -176,6 +179,9 @@ hard-tools/
 
 ### Core Utilities Overview
 - `bluetooth/bt-hid` : Advanced Bluetooth HID Device controller. Manages persistent `HidService` background daemon, connects to bonded targets, sends keystrokes/ASCII text strings, and executes wireless Hak5 DuckyScript payloads (`.duck`).
+- `bluetooth/bt-snoop` : Qualcomm BTSnoop HCI logging manager. Enables full baseband packet capture, exports logs to PCAP format, and streams live BTSnoop data over TCP (port 9998) to Wireshark.
+- `operator/ktrace.sh` : Linux kernel Ftrace, dynamic kprobes, and low-level event observability engine. Streams syscalls (`raw_syscalls:*`), Binder IPC (`binder:*`), network stack (`net:*`), and process scheduler events.
+- `network/net_recon.sh` : Passive Layer-2/3 network reconnaissance engine. Provides passive ARP host mapping, DHCP client snooper, real-time DNS monitor, and socket-to-PID attribution.
 - `bluetooth/bt-status` : Real-time power state, adapter MAC address, uptime, paired device count, and active A2DP/HFP sinks. Supports `--json`, `--raw`, and `--quiet`.
 - `bluetooth/bt-status-fast` : Sub-millisecond state querying via direct Binder fast path (`service call bluetooth_manager 3/6/7`).
 - `bluetooth/bt-toggle [on|off|toggle|ble-on|ble-off|reset|wait-on|wait-off]` : High-speed adapter power manipulation via `cmd bluetooth_manager`.
